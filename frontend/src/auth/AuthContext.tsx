@@ -12,6 +12,7 @@ import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { api, ApiError, setAuthToken } from "@/src/api/client";
 import { clearToken, loadToken, saveToken } from "@/src/auth/storage";
+import { rcEnabled, useSubscription } from "@/src/lib/revenuecat";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -30,6 +31,7 @@ export type AppUser = {
 type AuthContextValue = {
   status: "loading" | "authenticated" | "unauthenticated";
   user: AppUser | null;
+  purchaseIdentityError: string | null;
   signInEmail: (email: string, password: string) => Promise<void>;
   signUpEmail: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -47,8 +49,22 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthContextValue["status"]>("loading");
   const [user, setUser] = useState<AppUser | null>(null);
+  const [purchaseIdentityError, setPurchaseIdentityError] = useState<
+    string | null
+  >(null);
   const consumedSessionIds = useRef<Set<string>>(new Set());
   const initialUrlHandled = useRef(false);
+  const { bindIdentity, identityError } = useSubscription();
+
+  // Keep RevenueCat identity in sync with the app user on every auth path.
+  useEffect(() => {
+    if (!rcEnabled) return;
+    bindIdentity(user?.user_id ?? null);
+  }, [user?.user_id, bindIdentity]);
+
+  useEffect(() => {
+    setPurchaseIdentityError(identityError);
+  }, [identityError]);
 
   const applyAuth = useCallback(async (token: string, u: AppUser) => {
     await saveToken(token);
@@ -235,13 +251,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       status,
       user,
+      purchaseIdentityError,
       signInEmail,
       signUpEmail,
       signInWithGoogle,
       updateProfile,
       signOut: doSignOut,
     }),
-    [status, user, signInEmail, signUpEmail, signInWithGoogle, updateProfile, doSignOut],
+    [
+      status,
+      user,
+      purchaseIdentityError,
+      signInEmail,
+      signUpEmail,
+      signInWithGoogle,
+      updateProfile,
+      doSignOut,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

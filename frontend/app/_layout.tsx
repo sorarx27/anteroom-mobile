@@ -9,11 +9,18 @@ import { useEffect } from "react";
 import { ErrorBoundary } from "@/src/components/error-boundary";
 import { queryClient } from "@/src/query-client";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
+import { SubscriptionProvider, initializeRevenueCat } from "@/src/lib/revenuecat";
 
 LogBox.ignoreAllLogs(true);
 
+// One-time RevenueCat SDK init at module scope, BEFORE any component mounts.
+try {
+  initializeRevenueCat();
+} catch (err) {
+  console.warn("RevenueCat unavailable:", err);
+}
+
 const PUBLIC_ROUTES = new Set(["", "index", "onboarding", "auth"]);
-const AUTH_ONLY_ROUTES = new Set(["auth"]);
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { status, user } = useAuth();
@@ -26,12 +33,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
     if (status === "authenticated" && user) {
       if (!user.profile_completed) {
-        if (current !== "profile-setup") {
-          router.replace("/profile-setup");
-        }
+        if (current !== "profile-setup") router.replace("/profile-setup");
         return;
       }
-      // Fully onboarded — bounce off auth/onboarding/welcome
       if (
         current === "auth" ||
         current === "onboarding" ||
@@ -44,10 +48,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // unauthenticated: allow welcome, onboarding, auth
-    if (!PUBLIC_ROUTES.has(current)) {
-      router.replace("/");
-    }
+    if (!PUBLIC_ROUTES.has(current)) router.replace("/");
   }, [status, user, segments, router]);
 
   return <>{children}</>;
@@ -59,18 +60,20 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              <StatusBar style="auto" />
-              <AuthGate>
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    animation: "fade",
-                    contentStyle: { backgroundColor: "#FFFFFF" },
-                  }}
-                />
-              </AuthGate>
-            </AuthProvider>
+            <SubscriptionProvider>
+              <AuthProvider>
+                <StatusBar style="auto" />
+                <AuthGate>
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      animation: "fade",
+                      contentStyle: { backgroundColor: "#FFFFFF" },
+                    }}
+                  />
+                </AuthGate>
+              </AuthProvider>
+            </SubscriptionProvider>
           </QueryClientProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
