@@ -1,0 +1,173 @@
+{
+  "app_name": "Anteroom",
+  "personality": "1 iOS-Native Clean",
+  "personality_one_liner": "A calm, highly trustworthy, and friction-free clinical tool that respects the user's time and health data.",
+  "color": {
+    "surface": "#FFFFFF",
+    "onSurface": "#111815",
+    "surfaceSecondary": "#F4F7F6",
+    "onSurfaceSecondary": "#2C3E36",
+    "surfaceTertiary": "#E6EDE9",
+    "onSurfaceTertiary": "#455E53",
+    "surfaceInverse": "#111815",
+    "onSurfaceInverse": "#FFFFFF",
+    "brand": "#4B7A68",
+    "brandPrimary": "#365F50",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#DCE6E1",
+    "onBrandSecondary": "#2C3E36",
+    "brandTertiary": "#EAF0ED",
+    "onBrandTertiary": "#365F50",
+    "success": "#2D6B4E",
+    "onSuccess": "#FFFFFF",
+    "warning": "#8F671E",
+    "onWarning": "#FFFFFF",
+    "error": "#9E3838",
+    "onError": "#FFFFFF",
+    "info": "#4B7A68",
+    "onInfo": "#FFFFFF",
+    "border": "#E6EDE9",
+    "borderStrong": "#C2D1CB",
+    "divider": "#E6EDE9",
+    "muted": "#698075"
+  },
+  "typography": {
+    "displayFontFamily": "Plus Jakarta Sans",
+    "textFontFamily": "Plus Jakarta Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous iOS-native margins (lg/xl). Keep layout breathing with deliberate whitespace. Primary buttons stick to the bottom safe area.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": 1,
+  "navigation": "stack_only",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": true,
+    "do's": [
+      "Use glassmorphism for the sticky bottom container holding the primary CTA over scrollable onboarding or form content.",
+      "Use glassmorphism for the sticky header when scrolling down on the dashboard.",
+      "Apply a translucent tinted base (>=70% opacity of surface) behind the blur."
+    ],
+    "dont's": [
+      "Never apply glass to form inputs or standard list rows.",
+      "Do not use glass effects without a tinted base to ensure readability."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Welcome",
+      "purpose": "Splash screen with the Anteroom brand intro on a calming abstract gradient.",
+      "states": {
+        "loading": "Subtle fade animation of the logo.",
+        "empty": "N/A",
+        "error": "N/A"
+      },
+      "layout": "Full-bleed background image using the calm sage gradient. Apply the mandatory gradient-to-dark scrim (top to bottom). The 'Anteroom' wordmark and a brief tagline ('Clarity from chaos') sit in the lower third on top of the scrim, using onSurfaceInverse."
+    },
+    {
+      "name": "OnboardingCarousel",
+      "purpose": "2-slide horizontal paging carousel explaining the core value (messy papers -> 1-page PDF).",
+      "states": {
+        "loading": "N/A",
+        "empty": "N/A",
+        "error": "N/A"
+      },
+      "layout": "Full-bleed images for each slide. Slide 1 (Messy Desk), Slide 2 (Clean Clipboard). MUST include a vertical gradient scrim (transparent to >=70% surfaceInverse at the bottom). White text (title + subtext) sits in the bottom 40%. A sticky primary CTA ('Get Started') sits anchored at the bottom in a glass container over the carousel."
+    },
+    {
+      "name": "Auth",
+      "purpose": "Email/password and Google sign-in screen.",
+      "states": {
+        "loading": "Spinner on the active button (Email or Google).",
+        "empty": "N/A",
+        "error": "Inline red helper text below the affected field, plus a toast."
+      },
+      "layout": "Standard iOS layout. Top padding (3xl) with 'Welcome' header. Single column form for Email/Password. 'Continue' primary CTA (brandPrimary). A horizontal divider ('or' text in muted color). Google Sign-In button uses surfaceSecondary with the AntDesign Google vector icon (since image search returned photos, use native vector). Everything inside KeyboardAvoidingView."
+    },
+    {
+      "name": "ProfileSetup",
+      "purpose": "Collect Name, DOB, Language, and Country in a friction-free progressive form.",
+      "states": {
+        "loading": "Spinner on the sticky 'Complete Profile' CTA.",
+        "empty": "N/A",
+        "error": "Form validation errors highlighted with borderStrong red and muted error text."
+      },
+      "layout": "Scrollable View with lg outer padding. Group inputs logically: Personal (Name, DOB) and Preferences (Language - EN/ES, Country). Use native-feeling pickers or bottom sheets for selectors. Labels sit above inputs (never floating). A sticky 'Complete Profile' primary CTA sits in a fixed container (glass or solid surface) at the bottom."
+    },
+    {
+      "name": "EmptyDashboard",
+      "purpose": "Landing screen after onboarding when no briefs exist yet.",
+      "states": {
+        "loading": "Centered skeleton of a brief card.",
+        "empty": "Central illustration (clean clipboard photo) in a brandTertiary tinted rounded container. Title: 'No briefs yet'. Subtext: 'Snap your first referral or lab result to generate a 1-page summary.' Primary CTA below text: 'Create a brief'.",
+        "error": "Readable network error message + Retry button."
+      },
+      "layout": "Safe area header with 'Anteroom'. The main content flexes to fill the screen, centered vertically. The empty state image should have a soft tinted background. The layout focuses completely on the primary action to snap a document."
+    }
+  ],
+  "images": {
+    "welcome_splash_bg": {
+      "url": "https://images.unsplash.com/photo-1649861742672-20152f77c1f5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHwxfHxjYWxtJTIwc2FnZSUyMGdyZWVuJTIwYWJzdHJhY3QlMjBncmFkaWVudHxlbnwwfHx8fDE3ODk0ODU2MDR8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "Calm sage green abstract gradient"
+    },
+    "onboarding_slide_1": {
+      "url": "https://images.unsplash.com/photo-1500067803284-4304564c8655?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2ODl8MHwxfHNlYXJjaHwxfHxtZXNzeSUyMG1lZGljYWwlMjBwYXBlcnMlMjBvbiUyMGRlc2t8ZW58MHx8fHwxNzg5NDg1NjA0fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Messy desk with scattered papers"
+    },
+    "onboarding_slide_2": {
+      "url": "https://images.unsplash.com/photo-1651760680066-db9d32bd0357?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHwxfHxlbXB0eSUyMG1lZGljYWwlMjBjbGlwYm9hcmQlMjBjbGVhbnxlbnwwfHx8fDE3ODk0ODU2MDR8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "Clean empty medical clipboard"
+    },
+    "empty_dashboard_clipboard": {
+      "url": "https://images.unsplash.com/photo-1651760680066-db9d32bd0357?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHwxfHxlbXB0eSUyMG1lZGljYWwlMjBjbGlwYm9hcmQlMjBjbGVhbnxlbnwwfHx8fDE3ODk0ODU2MDR8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "Clean empty medical clipboard representing readiness"
+    }
+  },
+  "haptics": {
+    "primary_button_press": "impactLight",
+    "carousel_swipe": "selection",
+    "picker_scroll": "selection",
+    "success_action": "notificationSuccess",
+    "error_action": "notificationError"
+  },
+  "instructions_to_main_agent": [
+    "Adhere exactly to the iOS-Native Clean layout rules. Keep it minimal and highly legible, leaning into the medical trust palette.",
+    "Ensure strict ZERO TOLERANCE on blue hues. The app relies on Sage Green (#4B7A68) as its primary brand anchor to evoke trust and calm.",
+    "Implement the mandatory gradient-to-dark scrim (top to bottom, transparent to >=70% surfaceInverse) on the Welcome screen and all Onboarding full-bleed images before overlaying text.",
+    "For the Profile setup form, ensure the sticky 'Continue' button sits at the bottom in a safe-area aligned glass container, keeping it accessible while the user scrolls through the form.",
+    "For the Google Auth button, do NOT use the image search result URL, as it returned photos of screens. Instead, use a vector icon (e.g., AntDesign 'google') placed on a surfaceSecondary button to maintain a native UI feel.",
+    "Empty states must use flex: 1 to center the content vertically, and images should ideally be placed in a tinted rounded container to add depth without clutter."
+  ]
+}

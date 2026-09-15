@@ -1,0 +1,31 @@
+{
+  "summary": "Anteroom onboarding flow tested end-to-end (backend + frontend). Backend: 15/15 pytest tests PASS covering register (fresh/duplicate/invalid email/short pw), login (valid/invalid email/wrong pw), /auth/me (valid/no/bogus token), profile update (valid/invalid dob/invalid language), logout invalidates token, and health. Frontend: welcome, onboarding entry, auth signup + profile setup + dashboard render + session persistence + sign-out all working. ONE frontend bug: Onboarding 'Next' button does not advance the FlatList carousel from slide 1 to slide 2 on Expo web preview (dot indicator stays on slide 1 and CTA never becomes 'Create account'). Users cannot reach auth via the onboarding path on web. Also two testID naming mismatches vs review spec.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "app/onboarding.tsx", "issue": "Pressing onboarding-next-btn calls listRef.current?.scrollToIndex but the FlatList does not advance on Expo web preview. Dot indicator stays on slide 1 and CTA label remains 'Next' (never becomes 'Create account'), so user cannot reach /auth?mode=signup from onboarding on web. Direct navigation to /auth works, and login path works, so only the onboarding carousel is affected.", "testID": "onboarding-next-btn", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "onboarding FlatList", "issue": "FlatList horizontal pagingEnabled with scrollToIndex is unreliable on react-native-web. Consider using ScrollView with scrollTo({x}) or a Reanimated Carousel, or update index state directly in next() (setIndex(index+1)) and also scrollToOffset with x=index*SCREEN_W as a fallback."}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_anteroom_auth.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Fix onboarding Next button: on web, FlatList.scrollToIndex does not advance the pager. Update next() to also call setIndex(index+1) and use scrollToOffset({offset:(index+1)*SCREEN_W, animated:true}), or replace FlatList with ScrollView.",
+    "Optional: align country selector testID with review spec — spec says 'profile-country-btn' but code uses 'profile-country-select' (country options are 'profile-country-option-{ISO}'). Either update spec or rename to 'profile-country-btn'.",
+    "Optional: dashboard sign-out testID — code uses testID 'profile-signout-btn' inside profile-setup and appears to auto sign out via tapping dashboard-avatar (no explicit menu button; avatar tap alone triggered sign-out and returned to welcome-screen in test). Consider adding a labeled 'dashboard-signout-btn' for clarity."
+  ],
+  "critical_code_review_comments": [
+    "server.py: clean, uses async motor, bcrypt, TTL index on sessions, proper 401/409/422/400 responses. LGTM.",
+    "onboarding.tsx: relies on FlatList.scrollToIndex from a button; unreliable on react-native-web. next() should also update state and use scrollToOffset for cross-platform reliability."
+  ],
+  "updated_files": ["/app/backend/tests/test_anteroom_auth.py", "/app/test_reports/iteration_1.json", "/app/test_reports/pytest/pytest_results.xml"],
+  "success_rate": {"backend": "100%", "frontend": "~90% (onboarding carousel Next tap broken; all other flows pass)"},
+  "seed_data_creation": "Created test users via /api/auth/register: qa_{ts}@anteroom.dev, qa_logout_{ts}@anteroom.dev, qa_ui_{ts}@anteroom.dev (password123). Pre-seeded test1@anteroom.dev used for login.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend fully green with test_anteroom_auth.py (run with `pytest -o addopts=''` to disable xdist which breaks pytest.<attr> sharing). Frontend: onboarding-next-btn tap on Expo web does NOT advance FlatList; test the fix by pressing Next once from welcome->onboarding and confirming dot indicator moves to slide 2 and CTA text becomes 'Create account'. Full signup->profile->dashboard->reload persistence->signout->welcome sequence otherwise works. Country selector testIDs are 'profile-country-select' and 'profile-country-option-{ISO}'. Signout is triggered by tapping 'dashboard-avatar' (no separate menu button observed).",
+  "rca_of_issue": "Root cause of onboarding Next bug: In /app/frontend/app/onboarding.tsx, next() calls listRef.current?.scrollToIndex({index: index+1, animated:true}). On react-native-web, FlatList's scrollToIndex does not consistently scroll a horizontally paginated list; the underlying scroll container isn't repositioned, so the onScroll handler never fires and `index` state stays at 0. Result: CTA label stays 'Next' and users are stuck on slide 1. Fix: (1) setIndex(index+1) immediately in next(); (2) use listRef.current?.scrollToOffset({offset:(index+1)*SCREEN_W, animated:true}); (3) or replace FlatList with a horizontal ScrollView + Animated.event. Reproduction: open /, tap 'Get started', tap 'Next' — carousel does not advance."
+}
