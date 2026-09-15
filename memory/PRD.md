@@ -8,22 +8,28 @@ Mobile app that turns messy medical papers into a doctor-ready 1-page pre-visit 
 2. 2-slide onboarding carousel
 3. Auth: Email/Password + Emergent-managed Google Sign-In
 4. Profile setup: Name, DOB, Language (EN/ES), Country
-5. Dashboard with brief list + hero + locked-feature chips (free) + PRO badge (paid) + "Create a brief" CTA
+5. Dashboard with brief list + horizontal family strip + hero + locked-feature chips (free) + PRO badge (paid) + "Create a brief" CTA
 6. RevenueCat paywall (`/paywall`) — monthly (€2.99) + annual (€29.99), restore, `pro` entitlement gates
-7. Document capture (`/capture`) — take photo OR pick from gallery (multi-select), upload each to Emergent Object Storage against the user's draft brief
+7. Document capture (`/capture`) — take photo OR pick from gallery, upload to Emergent Object Storage against the active profile's draft brief
 8. Brief draft review (`/brief-draft?brief_id=…`) — photo grid + delete + doc-type chips + Save/Discard + Generate CTA
 9. Doc-type auto-detect via Gemini 3.5 Flash with manual override + Detect button
-10. **AI Brief Generation** — Gemini 3.1 Pro Preview extracts patient info, referral reason, medications and allergies VERBATIM from the photos. Nothing is invented, unreadable/high-risk items go to `flagged_items`. Rendered in `/brief-view` with QR to public share page, plus a downloadable 1-page PDF (watermarked for free, clean for Pro).
+10. AI Brief Generation via Gemini 3.1 Pro Preview — verbatim extraction only, no diagnosis; `/brief-view` scrollable page with QR share code; watermarked / clean 1-page PDF (RC entitlement client-side)
+11. **Family profiles (Pro)** — each user gets a self profile auto-created on register/login; Pro users can add partner / child / parent / other from `/profile-add`. Dashboard shows a horizontal strip with You + members + `+ Add`. Active profile persists between sessions (AsyncStorage) and scopes brief listings + new brief creation. Free users see all profiles but only Self is tappable — everything else opens the paywall. Removing a non-self profile soft-archives it AND all its briefs.
+12. **Brief translation (Pro)** — English ↔ Spanish translation of any generated brief via Gemini 3.1 Pro Preview. Chips on `/brief-draft` let the user pre-pick the output language before Generate (auto-translates after extraction). Chips on `/brief-view` toggle in-place, re-rendering from `content_translations[lang]` and downloading a Spanish-labelled PDF. Public QR share page respects `?lang=` and shows a language switcher. Free users tapping the non-source chip hit `/paywall?trigger=translate`. Strict guardrails: patient names, medication names, doses, frequencies, dates and IDs are copied verbatim; only referral reason, flagged items and allergy reactions are translated.
+
+## Backend collections
+- `profiles`: profile_id, user_id (owner), name, relationship ('self'|'partner'|'child'|'parent'|'other'), dob, sex, is_self, created_at, updated_at, deleted_at
+- `briefs` now includes `profile_id`, `source_language` (locked at generate-time), `content_translations` map keyed by target language
 
 ## Backend endpoints (new this iteration)
-- POST `/api/briefs/{id}/generate` — extract structured content with Gemini 3.1 Pro Preview, set status=complete, mint short-lived share_token (7 days)
-- GET  `/api/briefs/{id}/pdf?watermark=true|false&token=…` — server-rendered 1-page PDF via reportlab; client passes `watermark=false` when RC entitlement is active
-- GET  `/api/public/briefs/{share_token}` — unauthenticated HTML share page targeted by the QR code (mounted under /api so Kubernetes ingress reaches it)
+- POST `/api/briefs/{id}/generate` — extract structured content with Gemini 3.1 Pro Preview, set status=complete, mint short-lived share_token (7 days), record `source_language` from the user profile
+- POST `/api/briefs/{id}/translate` {target_language: 'en'|'es'} — Gemini 3.1 Pro Preview translation; caches under `content_translations[target_language]`; idempotent when the language matches source or is already cached
+- GET  `/api/briefs/{id}/pdf?watermark=…&lang=en|es&token=…` — server-rendered 1-page PDF via reportlab; localized section titles; falls back to source if the requested lang isn't cached
+- GET  `/api/public/briefs/{share_token}?lang=en|es` — unauthenticated HTML share page targeted by the QR code (mounted under /api so Kubernetes ingress reaches it); localized titles + language switcher
 
 ## Non-goals (deferred)
-- Brief generation, PDF export, QR
-- Family profiles UI beyond gating
-- Translation runtime
+- Family profiles UI beyond gating (done)
+- Backend refactoring — `server.py` still ~1400 lines; splitting into routers/ is P2
 - Reorder gestures (backend supports it; UI still to come)
 
 ## Tech

@@ -31,7 +31,8 @@ type PermissionPromptState = {
 export default function Capture() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { brief_id: routeBriefId } = useLocalSearchParams<{ brief_id?: string }>();
+  const { brief_id: routeBriefId, profile_id: routeProfileId } =
+    useLocalSearchParams<{ brief_id?: string; profile_id?: string }>();
 
   const [briefId, setBriefId] = useState<string | null>(routeBriefId ?? null);
   const [preparing, setPreparing] = useState(!routeBriefId);
@@ -46,7 +47,7 @@ export default function Capture() {
     let mounted = true;
     (async () => {
       try {
-        const created = await briefs.create("other");
+        const created = await briefs.create("other", routeProfileId ?? null);
         if (mounted) {
           setBriefId(created.brief_id);
           setTotalPhotos(created.photos.length);
@@ -60,7 +61,7 @@ export default function Capture() {
     return () => {
       mounted = false;
     };
-  }, [briefId]);
+  }, [briefId, routeProfileId]);
 
   const uploadAssets = async (assets: ImagePicker.ImagePickerAsset[]) => {
     if (!briefId) return;

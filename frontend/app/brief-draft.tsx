@@ -14,8 +14,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { Brief, briefs, DOC_TYPES } from "@/src/api/briefs";
+import {
+  BRIEF_LANGUAGES,
+  Brief,
+  BriefLanguage,
+  briefs,
+  DOC_TYPES,
+} from "@/src/api/briefs";
 import { getFileUrl } from "@/src/api/client";
+import { useAuth } from "@/src/auth/AuthContext";
+import { useSubscription } from "@/src/lib/revenuecat";
 import { colors, radius, spacing } from "@/src/theme";
 
 export default function BriefDraft() {
@@ -23,6 +31,8 @@ export default function BriefDraft() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { brief_id } = useLocalSearchParams<{ brief_id: string }>();
+  const { user } = useAuth();
+  const { isSubscribed } = useSubscription();
 
   const briefQuery = useQuery({
     queryKey: ["brief", brief_id],
@@ -43,6 +53,12 @@ export default function BriefDraft() {
   const [detecting, setDetecting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // The language the user wants the final brief rendered in. Defaults to
+  // their profile language. Changing to the non-source language is a Pro
+  // feature.
+  const defaultLang: BriefLanguage = (user?.language as BriefLanguage) || "en";
+  const [outputLang, setOutputLang] = useState<BriefLanguage>(defaultLang);
 
   const docType = brief?.doc_type ?? "other";
   const photoCount = brief?.photos.length ?? 0;
@@ -118,14 +134,36 @@ export default function BriefDraft() {
     setError(null);
     try {
       const updated = await briefs.generate(brief.brief_id);
-      setBrief(updated);
+      let finalBrief = updated;
+      const source = (updated.source_language as BriefLanguage) || "en";
+      // If the user picked a different target language, translate now.
+      if (outputLang && outputLang !== source && isSubscribed) {
+        try {
+          finalBrief = await briefs.translate(brief.brief_id, outputLang);
+        } catch (te: any) {
+          // Non-fatal — we still navigate; user can retry on brief-view.
+          console.warn("Auto-translate failed:", te?.message);
+        }
+      }
+      setBrief(finalBrief);
       queryClient.invalidateQueries({ queryKey: ["briefs"] });
-      router.replace(`/brief-view?brief_id=${updated.brief_id}`);
+      router.replace(`/brief-view?brief_id=${finalBrief.brief_id}`);
     } catch (e: any) {
       setError(e?.message ?? "Could not generate brief");
     } finally {
       setGenerating(false);
     }
+  };
+
+  const pickOutputLang = (lang: BriefLanguage) => {
+    if (lang === outputLang) return;
+    setError(null);
+    // Free tier: locked to the user's own language.
+    if (!isSubscribed && lang !== defaultLang) {
+      router.push("/paywall?trigger=translate");
+      return;
+    }
+    setOutputLang(lang);
   };
 
   const discard = async () => {
@@ -269,6 +307,61 @@ export default function BriefDraft() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
+            <Text style={styles.sectionLabel}>Brief language</Text>
+            {!isSubscribed ? (
+              <View style={styles.proTag}>
+                <Ionicons name="sparkles" size={11} color={colors.brandPrimary} />
+                <Text style={styles.proTagText}>PRO to switch</Text>
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.chipsRow}>
+            {BRIEF_LANGUAGES.map((lang) => {
+              const selected = outputLang === lang.key;
+              const locked = !isSubscribed && lang.key !== defaultLang;
+              return (
+                <Pressable
+                  key={lang.key}
+                  testID={`brief-draft-lang-${lang.key}`}
+                  onPress={() => pickOutputLang(lang.key)}
+                  style={[styles.chip, selected && styles.chipSelected]}
+                >
+                  {locked ? (
+                    <Ionicons
+                      name="lock-closed"
+                      size={12}
+                      color={selected ? colors.brandPrimary : colors.muted}
+                    />
+                  ) : (
+                    <Ionicons
+                      name={selected ? "checkmark-circle" : "language"}
+                      size={13}
+                      color={
+                        selected ? colors.brandPrimary : colors.onSurfaceSecondary
+                      }
+                    />
+                  )}
+                  <Text
+                    style={[
+                      styles.chipText,
+                      selected && styles.chipTextSelected,
+                    ]}
+                  >
+                    {lang.native}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {outputLang !== defaultLang ? (
+            <Text style={styles.langNote}>
+              Your brief will be translated after extraction — drug names, doses and dates stay verbatim.
+            </Text>
+          ) : null}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
             <Text style={styles.sectionLabel}>
               Photos ({photoCount})
             </Text>
@@ -364,12 +457,21 @@ export default function BriefDraft() {
               {generating ? (
                 <>
                   <ActivityIndicator color={colors.onBrandPrimary} />
-                  <Text style={styles.primaryBtnText}>Reading pages…</Text>
+                  <Text style={styles.primaryBtnText}>
+                    {outputLang !== defaultLang && isSubscribed
+                      ? "Reading & translating…"
+                      : "Reading pages…"}
+                  </Text>
                 </>
               ) : (
                 <>
                   <Ionicons name="sparkles" size={18} color={colors.onBrandPrimary} />
-                  <Text style={styles.primaryBtnText}>Generate brief</Text>
+                  <Text style={styles.primaryBtnText}>
+                    Generate brief
+                    {outputLang !== defaultLang && isSubscribed
+                      ? ` · ${outputLang.toUpperCase()}`
+                      : ""}
+                  </Text>
                 </>
               )}
             </Pressable>
@@ -472,6 +574,29 @@ const styles = StyleSheet.create({
   },
   chipText: { color: colors.onSurfaceSecondary, fontSize: 13, fontWeight: "600" },
   chipTextSelected: { color: colors.brandPrimary },
+  proTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brandTertiary,
+    borderWidth: 1,
+    borderColor: colors.brandSecondary,
+  },
+  proTagText: {
+    color: colors.brandPrimary,
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  langNote: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    fontStyle: "italic",
+  },
   detectBtn: {
     flexDirection: "row",
     alignItems: "center",

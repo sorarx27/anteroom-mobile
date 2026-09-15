@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
@@ -15,7 +15,12 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import QRCode from "react-native-qrcode-svg";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { briefs, DOC_TYPES } from "@/src/api/briefs";
+import {
+  BRIEF_LANGUAGES,
+  BriefLanguage,
+  briefs,
+  DOC_TYPES,
+} from "@/src/api/briefs";
 import { getBriefPdfUrl, getFileUrl, getPublicUrl } from "@/src/api/client";
 import { useSubscription } from "@/src/lib/revenuecat";
 import { colors, radius, spacing } from "@/src/theme";
@@ -38,22 +43,72 @@ export default function BriefView() {
   });
 
   const brief = briefQuery.data;
-  const content = brief?.content;
+  const [activeLang, setActiveLang] = useState<BriefLanguage | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [translateError, setTranslateError] = useState<string | null>(null);
+
+  const sourceLang: BriefLanguage =
+    (brief?.source_language as BriefLanguage) ?? "en";
+  const currentLang: BriefLanguage = activeLang ?? sourceLang;
+
+  const activeContent = useMemo(() => {
+    if (!brief) return null;
+    if (currentLang === sourceLang) return brief.content;
+    return brief.content_translations?.[currentLang] ?? brief.content;
+  }, [brief, currentLang, sourceLang]);
 
   const shareUrl = useMemo(
-    () => (brief?.share_url_path ? getPublicUrl(brief.share_url_path) : null),
-    [brief?.share_url_path],
+    () =>
+      brief?.share_url_path
+        ? getPublicUrl(
+            brief.share_url_path,
+            currentLang !== sourceLang ? currentLang : null,
+          )
+        : null,
+    [brief?.share_url_path, currentLang, sourceLang],
   );
+
+  const setBrief = (b: any) => queryClient.setQueryData(["brief", brief_id], b);
 
   const openPdf = () => {
     if (!brief) return;
-    const url = getBriefPdfUrl(brief.brief_id, !isSubscribed);
+    const langParam = currentLang !== sourceLang ? currentLang : null;
+    const url = getBriefPdfUrl(brief.brief_id, !isSubscribed, langParam);
     Linking.openURL(url).catch(() => {});
   };
 
   const openShare = () => {
     if (!shareUrl) return;
     Linking.openURL(shareUrl).catch(() => {});
+  };
+
+  const onPickLang = async (lang: BriefLanguage) => {
+    if (!brief || translating) return;
+    setTranslateError(null);
+    if (lang === sourceLang) {
+      setActiveLang(lang);
+      return;
+    }
+    // Free users need Pro to translate.
+    if (!isSubscribed) {
+      router.push("/paywall?trigger=translate");
+      return;
+    }
+    // Already cached?
+    if (brief.content_translations?.[lang]) {
+      setActiveLang(lang);
+      return;
+    }
+    setTranslating(true);
+    try {
+      const updated = await briefs.translate(brief.brief_id, lang);
+      setBrief(updated);
+      setActiveLang(lang);
+    } catch (e: any) {
+      setTranslateError(e?.message ?? "Could not translate brief");
+    } finally {
+      setTranslating(false);
+    }
   };
 
   if (briefQuery.isLoading || !brief) {
@@ -64,17 +119,17 @@ export default function BriefView() {
     );
   }
 
-  if (!content) {
+  if (!activeContent) {
     // Brief hasn't been generated yet — bounce back to review
     router.replace(`/brief-draft?brief_id=${brief.brief_id}`);
     return null;
   }
 
-  const patient = content.patient || {};
-  const meds = content.medications || [];
-  const allergies = content.allergies || [];
-  const referral = content.referral_reason;
-  const flagged = content.flagged_items || [];
+  const patient = activeContent.patient || {};
+  const meds = activeContent.medications || [];
+  const allergies = activeContent.allergies || [];
+  const referral = activeContent.referral_reason;
+  const flagged = activeContent.flagged_items || [];
 
   const nothingDetected =
     !patient.name &&
@@ -130,6 +185,70 @@ export default function BriefView() {
         </Pressable>
       ) : null}
 
+      <View style={styles.langRow} testID="brief-view-lang-row">
+        <Text style={styles.langLabel}>LANGUAGE</Text>
+        <View style={styles.langChips}>
+          {BRIEF_LANGUAGES.map((lang) => {
+            const selected = currentLang === lang.key;
+            const isSource = lang.key === sourceLang;
+            const isCached =
+              isSource || !!brief.content_translations?.[lang.key];
+            const showLock = !isSubscribed && !isSource;
+            return (
+              <Pressable
+                key={lang.key}
+                testID={`brief-view-lang-${lang.key}`}
+                onPress={() => onPickLang(lang.key)}
+                disabled={translating || selected}
+                style={[
+                  styles.langChip,
+                  selected && styles.langChipSelected,
+                  translating && !selected && styles.langChipDim,
+                ]}
+              >
+                {translating && !selected && !isCached ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.brandPrimary}
+                  />
+                ) : showLock ? (
+                  <Ionicons
+                    name="lock-closed"
+                    size={12}
+                    color={selected ? colors.brandPrimary : colors.muted}
+                  />
+                ) : (
+                  <Ionicons
+                    name={selected ? "checkmark-circle" : "language"}
+                    size={13}
+                    color={selected ? colors.brandPrimary : colors.onSurfaceSecondary}
+                  />
+                )}
+                <Text
+                  style={[
+                    styles.langChipText,
+                    selected && styles.langChipTextSelected,
+                  ]}
+                >
+                  {lang.native}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {translateError ? (
+          <Text style={styles.langError} testID="brief-view-lang-error">
+            {translateError}
+          </Text>
+        ) : translating ? (
+          <Text style={styles.langHint}>Translating your brief…</Text>
+        ) : currentLang !== sourceLang ? (
+          <Text style={styles.langHint}>
+            Translated · names, doses and dates stay verbatim
+          </Text>
+        ) : null}
+      </View>
+
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -138,7 +257,7 @@ export default function BriefView() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.disclaimer}>
-          Extracted directly from the patient's documents. No diagnosis, nothing invented — if a field isn't shown, it wasn't clearly on the page.
+          Extracted directly from the patient’s documents. No diagnosis, nothing invented — if a field isn’t shown, it wasn’t clearly on the page.
         </Text>
 
         {nothingDetected ? (
@@ -377,6 +496,55 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 0.4,
+  },
+  langRow: {
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  langLabel: {
+    color: colors.onSurfaceTertiary,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.5,
+  },
+  langChips: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    flexWrap: "wrap",
+  },
+  langChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    minHeight: 40,
+  },
+  langChipSelected: {
+    backgroundColor: colors.brandTertiary,
+    borderColor: colors.brandPrimary,
+  },
+  langChipDim: { opacity: 0.55 },
+  langChipText: {
+    color: colors.onSurfaceSecondary,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  langChipTextSelected: { color: colors.brandPrimary, fontWeight: "700" },
+  langHint: {
+    color: colors.muted,
+    fontSize: 11,
+    fontStyle: "italic",
+  },
+  langError: {
+    color: colors.error,
+    fontSize: 12,
+    fontWeight: "600",
   },
   scroll: {
     paddingHorizontal: spacing.xl,

@@ -11,6 +11,7 @@ export type BriefPhoto = {
 export type Brief = {
   brief_id: string;
   user_id: string;
+  profile_id: string;
   doc_type: "referral" | "med_list" | "lab_result" | "other";
   doc_type_manual_override: boolean;
   detected_doc_type: "referral" | "med_list" | "lab_result" | "other" | null;
@@ -18,11 +19,21 @@ export type Brief = {
   status: "draft" | "complete";
   photos: BriefPhoto[];
   content: BriefContent | null;
+  content_translations: Partial<Record<BriefLanguage, BriefContent>> | null;
+  source_language: BriefLanguage | null;
+  available_languages: BriefLanguage[];
   generated_at: string | null;
   share_url_path: string | null;
   created_at: string;
   updated_at: string;
 };
+
+export type BriefLanguage = "en" | "es";
+
+export const BRIEF_LANGUAGES: { key: BriefLanguage; label: string; native: string }[] = [
+  { key: "en", label: "English", native: "English" },
+  { key: "es", label: "Spanish", native: "Español" },
+];
 
 export type BriefContent = {
   patient?: {
@@ -49,9 +60,14 @@ export const DOC_TYPES: {
 ];
 
 export const briefs = {
-  create: (doc_type: Brief["doc_type"] = "other") =>
-    api.post<Brief>("/briefs", { doc_type }),
-  list: () => api.get<Brief[]>("/briefs"),
+  create: (
+    doc_type: Brief["doc_type"] = "other",
+    profile_id?: string | null,
+  ) => api.post<Brief>("/briefs", { doc_type, profile_id: profile_id ?? undefined }),
+  list: (profile_id?: string | null) =>
+    api.get<Brief[]>(
+      profile_id ? `/briefs?profile_id=${encodeURIComponent(profile_id)}` : "/briefs",
+    ),
   get: (brief_id: string) => api.get<Brief>(`/briefs/${brief_id}`),
   update: (
     brief_id: string,
@@ -71,4 +87,6 @@ export const briefs = {
   detectDocType: (brief_id: string) =>
     api.post<Brief>(`/briefs/${brief_id}/detect-doc-type`),
   generate: (brief_id: string) => api.post<Brief>(`/briefs/${brief_id}/generate`),
+  translate: (brief_id: string, target_language: BriefLanguage) =>
+    api.post<Brief>(`/briefs/${brief_id}/translate`, { target_language }),
 };

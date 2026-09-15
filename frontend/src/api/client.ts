@@ -117,20 +117,27 @@ export function getFileUrl(relativePath: string): {
 }
 
 /**
- * Absolute URL for the brief PDF endpoint, including token + watermark.
+ * Absolute URL for the brief PDF endpoint, including token + watermark + lang.
  * Used for opening in a native viewer / new tab.
  */
-export function getBriefPdfUrl(brief_id: string, watermark: boolean): string {
+export function getBriefPdfUrl(
+  brief_id: string,
+  watermark: boolean,
+  lang?: string | null,
+): string {
   const params = new URLSearchParams({
     watermark: watermark ? "true" : "false",
   });
+  if (lang) params.set("lang", lang);
   if (inMemoryToken) params.set("token", inMemoryToken);
   return `${BASE_URL}/api/briefs/${encodeURIComponent(brief_id)}/pdf?${params.toString()}`;
 }
 
 /** Absolute URL for the public share page — safe to render into a QR. */
-export function getPublicUrl(sharePath: string): string {
-  return `${BASE_URL}${sharePath}`;
+export function getPublicUrl(sharePath: string, lang?: string | null): string {
+  if (!lang) return `${BASE_URL}${sharePath}`;
+  const sep = sharePath.includes("?") ? "&" : "?";
+  return `${BASE_URL}${sharePath}${sep}lang=${encodeURIComponent(lang)}`;
 }
 
 export const api = {

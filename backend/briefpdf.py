@@ -25,6 +25,56 @@ LINE = colors.HexColor("#E6EDE9")
 ACCENT = colors.HexColor("#4B7A68")
 
 
+LABELS = {
+    "en": {
+        "subtitle": "Pre-visit brief",
+        "generated": "Generated",
+        "patient": "Patient",
+        "name": "Name",
+        "dob": "DOB",
+        "sex": "Sex",
+        "id": "ID",
+        "no_patient": "No patient details detected on the pages.",
+        "referral": "Referral reason",
+        "not_detected": "Not detected on the pages.",
+        "medications": "Medications",
+        "col_name": "NAME",
+        "col_dose": "DOSE",
+        "col_freq": "FREQUENCY",
+        "none": "None detected.",
+        "allergies": "Allergies",
+        "flagged": "Flagged for review",
+        "scan": "Scan to view online",
+        "footer_id": "Anteroom pre-visit brief • ID",
+        "footer_note": "Extracted directly from patient documents — no diagnosis.",
+        "watermark_ribbon": "ANTEROOM FREE — Upgrade for clean export",
+    },
+    "es": {
+        "subtitle": "Resumen previo a la visita",
+        "generated": "Generado",
+        "patient": "Paciente",
+        "name": "Nombre",
+        "dob": "Fecha nac.",
+        "sex": "Sexo",
+        "id": "ID",
+        "no_patient": "No se detectaron datos del paciente en las páginas.",
+        "referral": "Motivo de derivación",
+        "not_detected": "No detectado en las páginas.",
+        "medications": "Medicamentos",
+        "col_name": "NOMBRE",
+        "col_dose": "DOSIS",
+        "col_freq": "FRECUENCIA",
+        "none": "No se detectaron.",
+        "allergies": "Alergias",
+        "flagged": "Marcado para revisar",
+        "scan": "Escanear para ver en línea",
+        "footer_id": "Resumen previo Anteroom • ID",
+        "footer_note": "Extraído directamente de los documentos del paciente — sin diagnóstico.",
+        "watermark_ribbon": "ANTEROOM FREE — Actualiza para exportar sin marca",
+    },
+}
+
+
 def _draw_multiline(
     c: canvas.Canvas,
     text: str,
@@ -57,7 +107,7 @@ def _draw_multiline(
     return y
 
 
-def _draw_watermark(c: canvas.Canvas, page_w: float, page_h: float) -> None:
+def _draw_watermark(c: canvas.Canvas, page_w: float, page_h: float, ribbon_text: str) -> None:
     """Diagonal faint 'ANTEROOM FREE' across the page, plus a top ribbon."""
     c.saveState()
     c.setFillColor(colors.Color(0.55, 0.63, 0.58, alpha=0.15))
@@ -70,10 +120,10 @@ def _draw_watermark(c: canvas.Canvas, page_w: float, page_h: float) -> None:
     # Top-right ribbon
     c.saveState()
     c.setFillColor(colors.Color(0.21, 0.37, 0.31, alpha=0.9))
-    c.rect(page_w - 42 * mm, page_h - 10 * mm, 42 * mm, 6 * mm, stroke=0, fill=1)
+    c.rect(page_w - 62 * mm, page_h - 10 * mm, 62 * mm, 6 * mm, stroke=0, fill=1)
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 8)
-    c.drawCentredString(page_w - 21 * mm, page_h - 8 * mm, "ANTEROOM FREE — Upgrade for clean export")
+    c.drawCentredString(page_w - 31 * mm, page_h - 8 * mm, ribbon_text)
     c.restoreState()
 
 
@@ -92,8 +142,10 @@ def render_brief_pdf(
     watermarked: bool = True,
     share_url: Optional[str] = None,
     brief_id: str = "",
+    language: str = "en",
 ) -> bytes:
     """Render a single-page A4 PDF from a sanitized brief content dict."""
+    L = LABELS.get(language, LABELS["en"])
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     page_w, page_h = A4
@@ -107,9 +159,9 @@ def render_brief_pdf(
     c.drawString(margin_x, y, "Anteroom")
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 9)
-    c.drawString(margin_x, y - 12, "Pre-visit brief")
+    c.drawString(margin_x, y - 12, L["subtitle"])
     if generated_at:
-        c.drawRightString(right_x, y, f"Generated {generated_at}")
+        c.drawRightString(right_x, y, f"{L['generated']} {generated_at}")
     c.setFillColor(LINE)
     c.setLineWidth(0.5)
     c.line(margin_x, y - 18, right_x, y - 18)
@@ -124,21 +176,21 @@ def render_brief_pdf(
     # Patient block
     c.setFillColor(INK)
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(margin_x, y, "Patient")
+    c.drawString(margin_x, y, L["patient"])
     y -= 14
     c.setFont("Helvetica", 10)
     patient_lines = []
     if patient.get("name"):
-        patient_lines.append(("Name", patient["name"]))
+        patient_lines.append((L["name"], patient["name"]))
     if patient.get("dob"):
-        patient_lines.append(("DOB", patient["dob"]))
+        patient_lines.append((L["dob"], patient["dob"]))
     if patient.get("sex"):
-        patient_lines.append(("Sex", patient["sex"]))
+        patient_lines.append((L["sex"], patient["sex"]))
     if patient.get("id_number"):
-        patient_lines.append(("ID", patient["id_number"]))
+        patient_lines.append((L["id"], patient["id_number"]))
     if not patient_lines:
         c.setFillColor(MUTED)
-        c.drawString(margin_x, y, "No patient details detected on the pages.")
+        c.drawString(margin_x, y, L["no_patient"])
         y -= 14
         c.setFillColor(INK)
     else:
@@ -146,14 +198,14 @@ def render_brief_pdf(
             c.setFillColor(MUTED)
             c.drawString(margin_x, y, f"{label}")
             c.setFillColor(INK)
-            c.drawString(margin_x + 25 * mm, y, str(value))
+            c.drawString(margin_x + 30 * mm, y, str(value))
             y -= 12
     y -= 6
 
     # Referral reason
     c.setFillColor(INK)
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(margin_x, y, "Referral reason")
+    c.drawString(margin_x, y, L["referral"])
     y -= 14
     if referral:
         y = _draw_multiline(
@@ -163,23 +215,23 @@ def render_brief_pdf(
     else:
         c.setFillColor(MUTED)
         c.setFont("Helvetica-Oblique", 10)
-        c.drawString(margin_x, y, "Not detected on the pages.")
+        c.drawString(margin_x, y, L["not_detected"])
         y -= 12
     y -= 8
 
     # Medications
     c.setFillColor(INK)
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(margin_x, y, f"Medications ({len(meds)})")
+    c.drawString(margin_x, y, f"{L['medications']} ({len(meds)})")
     y -= 14
     if meds:
         col2 = margin_x + 65 * mm
         col3 = margin_x + 115 * mm
         c.setFont("Helvetica-Bold", 9)
         c.setFillColor(MUTED)
-        c.drawString(margin_x, y, "NAME")
-        c.drawString(col2, y, "DOSE")
-        c.drawString(col3, y, "FREQUENCY")
+        c.drawString(margin_x, y, L["col_name"])
+        c.drawString(col2, y, L["col_dose"])
+        c.drawString(col3, y, L["col_freq"])
         y -= 12
         c.setFont("Helvetica", 10)
         c.setFillColor(INK)
@@ -193,14 +245,14 @@ def render_brief_pdf(
     else:
         c.setFillColor(MUTED)
         c.setFont("Helvetica-Oblique", 10)
-        c.drawString(margin_x, y, "None detected.")
+        c.drawString(margin_x, y, L["none"])
         y -= 12
     y -= 6
 
     # Allergies
     c.setFillColor(INK)
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(margin_x, y, f"Allergies ({len(allergies)})")
+    c.drawString(margin_x, y, f"{L['allergies']} ({len(allergies)})")
     y -= 14
     if allergies:
         c.setFont("Helvetica", 10)
@@ -218,7 +270,7 @@ def render_brief_pdf(
     else:
         c.setFillColor(MUTED)
         c.setFont("Helvetica-Oblique", 10)
-        c.drawString(margin_x, y, "None detected.")
+        c.drawString(margin_x, y, L["none"])
         y -= 12
     y -= 6
 
@@ -226,7 +278,7 @@ def render_brief_pdf(
     if flagged:
         c.setFillColor(colors.HexColor("#9E3838"))
         c.setFont("Helvetica-Bold", 12)
-        c.drawString(margin_x, y, "Flagged for review")
+        c.drawString(margin_x, y, L["flagged"])
         y -= 14
         c.setFillColor(INK)
         c.setFont("Helvetica", 10)
@@ -250,7 +302,7 @@ def render_brief_pdf(
             c.drawImage(qr_img, qr_x, qr_y, qr_size, qr_size)
             c.setFillColor(MUTED)
             c.setFont("Helvetica", 7)
-            c.drawRightString(right_x, qr_y - 4, "Scan to view online")
+            c.drawRightString(right_x, qr_y - 4, L["scan"])
         except Exception:
             pass
 
@@ -259,11 +311,11 @@ def render_brief_pdf(
     c.line(margin_x, 15 * mm, right_x, 15 * mm)
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 8)
-    c.drawString(margin_x, 10 * mm, f"Anteroom pre-visit brief • ID {brief_id}")
-    c.drawRightString(right_x, 10 * mm, "Extracted directly from patient documents — no diagnosis.")
+    c.drawString(margin_x, 10 * mm, f"{L['footer_id']} {brief_id}")
+    c.drawRightString(right_x, 10 * mm, L["footer_note"])
 
     if watermarked:
-        _draw_watermark(c, page_w, page_h)
+        _draw_watermark(c, page_w, page_h, L["watermark_ribbon"])
 
     c.showPage()
     c.save()

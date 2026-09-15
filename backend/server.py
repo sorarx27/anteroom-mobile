@@ -18,6 +18,7 @@ import httpx
 from storage import init_storage, put_object, get_object, StorageError, APP_NAME
 from docclassifier import classify_image
 from briefgen import generate_brief_content
+from brieftranslator import translate_brief_content, LANGUAGE_NAMES
 from briefpdf import render_brief_pdf
 import asyncio
 
@@ -173,6 +174,7 @@ async def register(payload: RegisterRequest):
         "created_at": datetime.now(timezone.utc),
     }
     await db.users.insert_one(user_doc)
+    await _ensure_self_profile(user_doc)
     token = await _create_session(user_doc["user_id"])
     return AuthResponse(session_token=token, user=to_user_out(user_doc))
 
@@ -188,6 +190,7 @@ async def login(payload: LoginRequest):
     )
     if not ok:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    await _ensure_self_profile(user)
     token = await _create_session(user["user_id"])
     return AuthResponse(session_token=token, user=to_user_out(user))
 
@@ -241,6 +244,7 @@ async def google_session(payload: GoogleSessionRequest):
         }
         await db.users.insert_one(user_doc)
 
+    await _ensure_self_profile(user_doc)
     token = await _create_session(user_doc["user_id"])
     return AuthResponse(session_token=token, user=to_user_out(user_doc))
 
@@ -280,7 +284,210 @@ async def update_profile(
     }
     await db.users.update_one({"user_id": user["user_id"]}, {"$set": updates})
     user.update(updates)
+    await _ensure_self_profile(user)
     return to_user_out(user)
+
+
+# ---------------------------------------------------------------------------
+# Family profiles
+# ---------------------------------------------------------------------------
+RELATIONSHIPS = {"self", "partner", "child", "parent", "other"}
+
+
+class ProfileOut(BaseModel):
+    profile_id: str
+    user_id: str
+    name: str
+    relationship: str  # 'self' | 'partner' | 'child' | 'parent' | 'other'
+    dob: Optional[str] = None
+    sex: Optional[str] = None
+    is_self: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class CreateProfileRequest(BaseModel):
+    name: str = Field(min_length=1)
+    relationship: str  # partner|child|parent|other  (self is auto-created)
+    dob: Optional[str] = None
+    sex: Optional[str] = None
+
+
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = None
+    relationship: Optional[str] = None
+    dob: Optional[str] = None
+    sex: Optional[str] = None
+
+
+def _profile_to_out(doc: dict) -> ProfileOut:
+    return ProfileOut(
+        profile_id=doc["profile_id"],
+        user_id=doc["user_id"],
+        name=doc["name"],
+        relationship=doc["relationship"],
+        dob=doc.get("dob"),
+        sex=doc.get("sex"),
+        is_self=bool(doc.get("is_self", False)),
+        created_at=doc["created_at"],
+        updated_at=doc["updated_at"],
+    )
+
+
+async def _ensure_self_profile(user: dict) -> dict:
+    """Return (creating if needed) the user's self profile."""
+    existing = await db.profiles.find_one(
+        {"user_id": user["user_id"], "is_self": True, "deleted_at": None},
+        {"_id": 0},
+    )
+    if existing:
+        return existing
+    now = datetime.now(timezone.utc)
+    doc = {
+        "profile_id": f"prof_{uuid.uuid4().hex[:12]}",
+        "user_id": user["user_id"],
+        "name": (user.get("name") or "You").strip() or "You",
+        "relationship": "self",
+        "dob": user.get("dob"),
+        "sex": None,
+        "is_self": True,
+        "created_at": now,
+        "updated_at": now,
+        "deleted_at": None,
+    }
+    await db.profiles.insert_one(doc)
+    return doc
+
+
+def _validate_dob(dob: Optional[str]) -> Optional[str]:
+    if dob is None or dob == "":
+        return None
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", dob):
+        raise HTTPException(status_code=400, detail="dob must be YYYY-MM-DD")
+    try:
+        datetime.strptime(dob, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid dob")
+    return dob
+
+
+@api_router.get("/profiles", response_model=List[ProfileOut])
+async def list_profiles(user: dict = Depends(get_current_user)):
+    await _ensure_self_profile(user)
+    cursor = db.profiles.find(
+        {"user_id": user["user_id"], "deleted_at": None}, {"_id": 0}
+    ).sort([("is_self", -1), ("created_at", 1)])
+    docs = await cursor.to_list(50)
+    return [_profile_to_out(d) for d in docs]
+
+
+@api_router.post("/profiles", response_model=ProfileOut)
+async def create_profile(
+    payload: CreateProfileRequest, user: dict = Depends(get_current_user)
+):
+    rel = payload.relationship.lower().strip()
+    if rel not in RELATIONSHIPS or rel == "self":
+        raise HTTPException(
+            status_code=400,
+            detail="relationship must be one of partner|child|parent|other",
+        )
+    sex = (payload.sex or None)
+    if sex is not None and sex not in ("male", "female", "other"):
+        raise HTTPException(status_code=400, detail="Invalid sex")
+    dob = _validate_dob(payload.dob)
+    now = datetime.now(timezone.utc)
+    doc = {
+        "profile_id": f"prof_{uuid.uuid4().hex[:12]}",
+        "user_id": user["user_id"],
+        "name": payload.name.strip(),
+        "relationship": rel,
+        "dob": dob,
+        "sex": sex,
+        "is_self": False,
+        "created_at": now,
+        "updated_at": now,
+        "deleted_at": None,
+    }
+    await db.profiles.insert_one(doc)
+    return _profile_to_out(doc)
+
+
+@api_router.patch("/profiles/{profile_id}", response_model=ProfileOut)
+async def update_profile_endpoint(
+    profile_id: str,
+    payload: UpdateProfileRequest,
+    user: dict = Depends(get_current_user),
+):
+    doc = await db.profiles.find_one(
+        {"profile_id": profile_id, "user_id": user["user_id"], "deleted_at": None},
+        {"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    updates: dict = {"updated_at": datetime.now(timezone.utc)}
+    if payload.name is not None:
+        n = payload.name.strip()
+        if not n:
+            raise HTTPException(status_code=400, detail="Name cannot be empty")
+        updates["name"] = n
+    if payload.relationship is not None:
+        rel = payload.relationship.lower().strip()
+        if rel not in RELATIONSHIPS:
+            raise HTTPException(status_code=400, detail="Invalid relationship")
+        if doc.get("is_self") and rel != "self":
+            raise HTTPException(
+                status_code=400, detail="Cannot change relationship on Self profile"
+            )
+        if rel == "self" and not doc.get("is_self"):
+            raise HTTPException(status_code=400, detail="Only one Self profile allowed")
+        updates["relationship"] = rel
+    if payload.dob is not None:
+        updates["dob"] = _validate_dob(payload.dob)
+    if payload.sex is not None:
+        if payload.sex not in ("male", "female", "other", ""):
+            raise HTTPException(status_code=400, detail="Invalid sex")
+        updates["sex"] = payload.sex or None
+    await db.profiles.update_one({"profile_id": profile_id}, {"$set": updates})
+    doc.update(updates)
+    return _profile_to_out(doc)
+
+
+@api_router.delete("/profiles/{profile_id}")
+async def delete_profile_endpoint(
+    profile_id: str, user: dict = Depends(get_current_user)
+):
+    doc = await db.profiles.find_one(
+        {"profile_id": profile_id, "user_id": user["user_id"], "deleted_at": None},
+        {"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    if doc.get("is_self"):
+        raise HTTPException(status_code=400, detail="The Self profile cannot be removed")
+    now = datetime.now(timezone.utc)
+    await db.profiles.update_one(
+        {"profile_id": profile_id}, {"$set": {"deleted_at": now, "updated_at": now}}
+    )
+    # Soft-archive that profile's briefs too.
+    await db.briefs.update_many(
+        {
+            "profile_id": profile_id,
+            "user_id": user["user_id"],
+            "deleted_at": None,
+        },
+        {"$set": {"deleted_at": now}},
+    )
+    return {"ok": True}
+
+
+async def _get_profile_or_404(user: dict, profile_id: str) -> dict:
+    doc = await db.profiles.find_one(
+        {"profile_id": profile_id, "user_id": user["user_id"], "deleted_at": None},
+        {"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return doc
 
 
 # ---------------------------------------------------------------------------
@@ -302,6 +509,7 @@ class BriefPhotoOut(BaseModel):
 class BriefOut(BaseModel):
     brief_id: str
     user_id: str
+    profile_id: str
     doc_type: str
     doc_type_manual_override: bool = False
     detected_doc_type: Optional[str] = None
@@ -309,6 +517,9 @@ class BriefOut(BaseModel):
     status: str  # 'draft' | 'complete'
     photos: List[BriefPhotoOut]
     content: Optional[dict] = None  # generated brief content
+    content_translations: Optional[dict] = None  # {"es": {...}, "en": {...}}
+    source_language: Optional[str] = None  # locked at generate-time
+    available_languages: List[str] = []  # union of source_language + cached translations
     generated_at: Optional[datetime] = None
     share_url_path: Optional[str] = None  # /public/briefs/{share_token}
     created_at: datetime
@@ -317,6 +528,7 @@ class BriefOut(BaseModel):
 
 class CreateBriefRequest(BaseModel):
     doc_type: Optional[str] = "other"
+    profile_id: Optional[str] = None
 
 
 class UpdateBriefRequest(BaseModel):
@@ -337,9 +549,18 @@ def _brief_to_out(doc: dict) -> BriefOut:
         for p in doc.get("photos", [])
         if not p.get("deleted_at")
     ]
+    translations = doc.get("content_translations") or {}
+    source_lang = doc.get("source_language")
+    langs: list[str] = []
+    if source_lang:
+        langs.append(source_lang)
+    for k in translations.keys():
+        if k not in langs:
+            langs.append(k)
     return BriefOut(
         brief_id=doc["brief_id"],
         user_id=doc["user_id"],
+        profile_id=doc.get("profile_id", ""),
         doc_type=doc.get("doc_type", "other"),
         doc_type_manual_override=bool(doc.get("doc_type_manual_override", False)),
         detected_doc_type=doc.get("detected_doc_type"),
@@ -347,6 +568,9 @@ def _brief_to_out(doc: dict) -> BriefOut:
         status=doc.get("status", "draft"),
         photos=photos,
         content=doc.get("content"),
+        content_translations=translations or None,
+        source_language=source_lang,
+        available_languages=langs,
         generated_at=doc.get("generated_at"),
         share_url_path=(
             f"/api/public/briefs/{doc['share_token']}"
@@ -365,10 +589,16 @@ async def create_brief(
     doc_type = (payload.doc_type or "other").lower()
     if doc_type not in DOC_TYPES:
         raise HTTPException(status_code=400, detail=f"doc_type must be one of {sorted(DOC_TYPES)}")
+    # Resolve profile: explicit id, else the self profile.
+    if payload.profile_id:
+        profile = await _get_profile_or_404(user, payload.profile_id)
+    else:
+        profile = await _ensure_self_profile(user)
     now = datetime.now(timezone.utc)
     brief = {
         "brief_id": f"brief_{uuid.uuid4().hex[:12]}",
         "user_id": user["user_id"],
+        "profile_id": profile["profile_id"],
         "doc_type": doc_type,
         "doc_type_manual_override": False,
         "detected_doc_type": None,
@@ -384,11 +614,16 @@ async def create_brief(
 
 
 @api_router.get("/briefs", response_model=List[BriefOut])
-async def list_briefs(user: dict = Depends(get_current_user)):
-    cursor = db.briefs.find(
-        {"user_id": user["user_id"], "deleted_at": None},
-        {"_id": 0},
-    ).sort("updated_at", -1)
+async def list_briefs(
+    user: dict = Depends(get_current_user),
+    profile_id: Optional[str] = Query(default=None),
+):
+    query: dict = {"user_id": user["user_id"], "deleted_at": None}
+    if profile_id:
+        # Validate ownership
+        await _get_profile_or_404(user, profile_id)
+        query["profile_id"] = profile_id
+    cursor = db.briefs.find(query, {"_id": 0}).sort("updated_at", -1)
     docs = await cursor.to_list(200)
     return [_brief_to_out(d) for d in docs]
 
@@ -721,6 +956,9 @@ async def generate_brief(brief_id: str, user: dict = Depends(get_current_user)):
     now = datetime.now(timezone.utc)
     share_token = doc.get("share_token") or uuid.uuid4().hex
     share_expires_at = now + timedelta(days=7)
+    source_lang = (user.get("language") or "en").lower()
+    if source_lang not in LANGUAGE_NAMES:
+        source_lang = "en"
     await db.briefs.update_one(
         {"brief_id": brief_id},
         {
@@ -730,6 +968,8 @@ async def generate_brief(brief_id: str, user: dict = Depends(get_current_user)):
                 "generated_at": now,
                 "share_token": share_token,
                 "share_expires_at": share_expires_at,
+                "source_language": source_lang,
+                "content_translations": {},
                 "updated_at": now,
             }
         },
@@ -741,9 +981,68 @@ async def generate_brief(brief_id: str, user: dict = Depends(get_current_user)):
             "generated_at": now,
             "share_token": share_token,
             "share_expires_at": share_expires_at,
+            "source_language": source_lang,
+            "content_translations": {},
             "updated_at": now,
         }
     )
+    return _brief_to_out(doc)
+
+
+class TranslateBriefRequest(BaseModel):
+    target_language: str  # 'en' | 'es'
+
+
+@api_router.post("/briefs/{brief_id}/translate", response_model=BriefOut)
+async def translate_brief(
+    brief_id: str,
+    payload: TranslateBriefRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Translate an already-generated brief's content into another language.
+
+    The translated payload is cached on the brief so subsequent requests are
+    instant. Callers pass `target_language`; if it matches `source_language`
+    we simply no-op.
+    """
+    target = (payload.target_language or "").lower().strip()
+    if target not in LANGUAGE_NAMES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"target_language must be one of {sorted(LANGUAGE_NAMES)}",
+        )
+    doc = await db.briefs.find_one(
+        {"brief_id": brief_id, "user_id": user["user_id"], "deleted_at": None},
+        {"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Brief not found")
+    if not doc.get("content"):
+        raise HTTPException(status_code=400, detail="Brief has not been generated yet")
+
+    source_lang = (doc.get("source_language") or "en").lower()
+    # Same language → no work.
+    if target == source_lang:
+        return _brief_to_out(doc)
+
+    translations = doc.get("content_translations") or {}
+    if target in translations:
+        return _brief_to_out(doc)
+
+    try:
+        translated = await translate_brief_content(doc["content"], target)
+    except Exception as e:
+        logger.exception("Brief translation failed: %s", e)
+        raise HTTPException(status_code=502, detail="Translation failed")
+
+    translations = {**translations, target: translated}
+    now = datetime.now(timezone.utc)
+    await db.briefs.update_one(
+        {"brief_id": brief_id},
+        {"$set": {"content_translations": translations, "updated_at": now}},
+    )
+    doc["content_translations"] = translations
+    doc["updated_at"] = now
     return _brief_to_out(doc)
 
 
@@ -757,12 +1056,16 @@ async def get_brief_pdf(
     brief_id: str,
     request: Request,
     watermark: bool = Query(default=True),
+    lang: Optional[str] = Query(default=None),
     token: Optional[str] = Query(default=None),
 ):
     """Render the brief as a 1-page PDF. `watermark` controls the free-tier ribbon.
 
     The client (which is the source of truth for Pro entitlement via
     RevenueCat) passes `watermark=false` when the user is subscribed.
+
+    `lang` selects which cached translation to render. Defaults to the
+    source language. Unknown / missing translations fall back to source.
     """
     user = await _resolve_user_from_bearer_or_token(request, token)
     doc = await db.briefs.find_one(
@@ -774,6 +1077,15 @@ async def get_brief_pdf(
     if not doc.get("content"):
         raise HTTPException(status_code=400, detail="Brief has not been generated yet")
 
+    source_lang = (doc.get("source_language") or "en").lower()
+    translations = doc.get("content_translations") or {}
+    requested = (lang or "").lower().strip() or source_lang
+    if requested != source_lang and requested in translations:
+        active_content = translations[requested]
+    else:
+        active_content = doc["content"]
+        requested = source_lang
+
     share_url = None
     if doc.get("share_token"):
         share_url = _public_share_url(request, doc["share_token"])
@@ -781,22 +1093,23 @@ async def get_brief_pdf(
     generated_at_str = generated_at.strftime("%Y-%m-%d %H:%M UTC") if generated_at else ""
     pdf_bytes = await run_in_threadpool(
         render_brief_pdf,
-        doc["content"],
+        active_content,
         doc_type_label=doc.get("doc_type", "other"),
         generated_at=generated_at_str,
         watermarked=watermark,
         share_url=share_url or "",
         brief_id=brief_id,
+        language=requested,
     )
     headers = {
-        "Content-Disposition": f'inline; filename="anteroom-brief-{brief_id}.pdf"'
+        "Content-Disposition": f'inline; filename="anteroom-brief-{brief_id}-{requested}.pdf"'
     }
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 
 # ---- Public (unauthenticated) share view — mounted under /api so ingress reaches it ----
 @api_router.get("/public/briefs/{share_token}")
-async def public_brief_view(share_token: str):
+async def public_brief_view(share_token: str, lang: Optional[str] = Query(default=None)):
     doc = await db.briefs.find_one(
         {"share_token": share_token, "deleted_at": None}, {"_id": 0}
     )
@@ -816,7 +1129,7 @@ async def public_brief_view(share_token: str):
                 media_type="text/html",
                 status_code=410,
             )
-    html = _share_html(doc)
+    html = _share_html(doc, lang or None)
     return Response(content=html, media_type="text/html")
 
 
@@ -825,18 +1138,63 @@ def _esc(v: Any) -> str:
     return html.escape(str(v)) if v is not None else ""
 
 
+_SHARE_LABELS = {
+    "en": {
+        "title": "Pre-visit brief",
+        "generated": "Generated",
+        "disclaimer": "Anteroom · Extracted directly from patient documents — no diagnosis.",
+        "patient": "Patient",
+        "name": "Name",
+        "dob": "DOB",
+        "sex": "Sex",
+        "id": "ID",
+        "no_patient": "No patient details detected.",
+        "referral": "Referral reason",
+        "not_detected": "Not detected on the pages.",
+        "medications": "Medications",
+        "allergies": "Allergies",
+        "none": "None detected.",
+        "flagged": "Flagged for review",
+        "not_found_title": "Brief not found",
+        "not_found_body": "This brief link is invalid.",
+        "expired_title": "Link expired",
+        "expired_body": "This share link has expired. Ask the patient to regenerate it.",
+    },
+    "es": {
+        "title": "Resumen previo a la visita",
+        "generated": "Generado",
+        "disclaimer": "Anteroom · Extraído directamente de los documentos del paciente — sin diagnóstico.",
+        "patient": "Paciente",
+        "name": "Nombre",
+        "dob": "Fecha nac.",
+        "sex": "Sexo",
+        "id": "ID",
+        "no_patient": "No se detectaron datos del paciente.",
+        "referral": "Motivo de derivación",
+        "not_detected": "No detectado en las páginas.",
+        "medications": "Medicamentos",
+        "allergies": "Alergias",
+        "none": "No se detectaron.",
+        "flagged": "Marcado para revisar",
+        "not_found_title": "Resumen no encontrado",
+        "not_found_body": "Este enlace no es válido.",
+        "expired_title": "Enlace caducado",
+        "expired_body": "Este enlace ha caducado. Pide al paciente que lo regenere.",
+    },
+}
+
+
 def _share_html_not_found() -> str:
-    return _share_wrapper("Brief not found", "<p>This brief link is invalid.</p>")
+    L = _SHARE_LABELS["en"]
+    return _share_wrapper(L["not_found_title"], f"<p>{L['not_found_body']}</p>", L["disclaimer"])
 
 
 def _share_html_expired() -> str:
-    return _share_wrapper(
-        "Link expired",
-        "<p>This share link has expired. Ask the patient to regenerate it.</p>",
-    )
+    L = _SHARE_LABELS["en"]
+    return _share_wrapper(L["expired_title"], f"<p>{L['expired_body']}</p>", L["disclaimer"])
 
 
-def _share_wrapper(title: str, body: str) -> str:
+def _share_wrapper(title: str, body: str, disclaimer: str) -> str:
     return f"""<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title} — Anteroom</title>
@@ -854,14 +1212,31 @@ def _share_wrapper(title: str, body: str) -> str:
   .footer{{margin-top:32px;color:#698075;font-size:11px;text-align:center}}
   .flag{{background:#FFF3F3;border:1px solid #E6D0D0;color:#9E3838;padding:8px 12px;border-radius:12px;margin:6px 0;font-size:13px}}
   .empty{{color:#698075;font-style:italic}}
+  .lang{{display:inline-flex;gap:6px;margin:8px 0 0}}
+  .lang a{{display:inline-block;padding:4px 10px;border-radius:999px;background:#E6EDE9;
+       color:#365F50;text-decoration:none;font-size:11px;font-weight:700;letter-spacing:0.4px}}
+  .lang a.active{{background:#365F50;color:#fff}}
 </style>
 </head><body><main><h1>{title}</h1>{body}
-<div class="footer">Anteroom · Extracted directly from patient documents — no diagnosis.</div>
+<div class="footer">{disclaimer}</div>
 </main></body></html>"""
 
 
-def _share_html(doc: dict) -> str:
-    content = doc.get("content") or {}
+def _share_html(doc: dict, lang: Optional[str] = None) -> str:
+    source_lang = (doc.get("source_language") or "en").lower()
+    translations = doc.get("content_translations") or {}
+    requested = (lang or "").lower() if lang else source_lang
+    if requested == source_lang:
+        content = doc.get("content") or {}
+        active_lang = source_lang
+    elif requested in translations:
+        content = translations[requested]
+        active_lang = requested
+    else:
+        content = doc.get("content") or {}
+        active_lang = source_lang
+
+    L = _SHARE_LABELS.get(active_lang, _SHARE_LABELS["en"])
     patient = content.get("patient") or {}
     meds = content.get("medications") or []
     allergies = content.get("allergies") or []
@@ -877,12 +1252,12 @@ def _share_html(doc: dict) -> str:
 
     patient_html = "".join(
         [
-            kv("Name", patient.get("name")),
-            kv("DOB", patient.get("dob")),
-            kv("Sex", patient.get("sex")),
-            kv("ID", patient.get("id_number")),
+            kv(L["name"], patient.get("name")),
+            kv(L["dob"], patient.get("dob")),
+            kv(L["sex"], patient.get("sex")),
+            kv(L["id"], patient.get("id_number")),
         ]
-    ) or '<div class="empty">No patient details detected.</div>'
+    ) or f'<div class="empty">{L["no_patient"]}</div>'
 
     meds_html = (
         "".join(
@@ -890,7 +1265,7 @@ def _share_html(doc: dict) -> str:
             f'<span class="muted">{_esc(m.get("dose") or "—")} · {_esc(m.get("frequency") or "—")}</span></div>'
             for m in meds
         )
-        or '<div class="empty">None detected.</div>'
+        or f'<div class="empty">{L["none"]}</div>'
     )
 
     allergies_html = (
@@ -899,31 +1274,45 @@ def _share_html(doc: dict) -> str:
             f'<span class="muted">{_esc(a.get("reaction") or "—")}</span></div>'
             for a in allergies
         )
-        or '<div class="empty">None detected.</div>'
+        or f'<div class="empty">{L["none"]}</div>'
     )
 
     referral_html = (
         f"<p>{_esc(referral)}</p>"
         if referral
-        else '<p class="empty">Not detected on the pages.</p>'
+        else f'<p class="empty">{L["not_detected"]}</p>'
     )
 
     flagged_html = ""
     if flagged:
-        flagged_html = "<h2>Flagged for review</h2>" + "".join(
+        flagged_html = f'<h2>{L["flagged"]}</h2>' + "".join(
             f'<div class="flag">{_esc(f)}</div>' for f in flagged
         )
 
+    # Build language switcher — always show source; other langs only if cached.
+    available = [source_lang] + [l for l in translations.keys() if l != source_lang]
+    if len(available) > 1:
+        base_path = f"/api/public/briefs/{doc.get('share_token','')}"
+        chips = " ".join(
+            f'<a class="{"active" if l == active_lang else ""}" href="{base_path}?lang={l}">{_esc(l.upper())}</a>'
+            for l in available
+        )
+        lang_switch = f'<div class="lang">{chips}</div>'
+    else:
+        lang_switch = ""
+
     return _share_wrapper(
-        "Pre-visit brief",
+        L["title"],
         f"""
-<p class="muted">Generated {_esc(gen_str)} · Anteroom · Extracted directly from patient documents — no diagnosis.</p>
-<h2>Patient</h2>{patient_html}
-<h2>Referral reason</h2>{referral_html}
-<h2>Medications ({len(meds)})</h2>{meds_html}
-<h2>Allergies ({len(allergies)})</h2>{allergies_html}
+<p class="muted">{L["generated"]} {_esc(gen_str)} · {L["disclaimer"]}</p>
+{lang_switch}
+<h2>{L["patient"]}</h2>{patient_html}
+<h2>{L["referral"]}</h2>{referral_html}
+<h2>{L["medications"]} ({len(meds)})</h2>{meds_html}
+<h2>{L["allergies"]} ({len(allergies)})</h2>{allergies_html}
 {flagged_html}
 """,
+        L["disclaimer"],
     )
 
 
@@ -947,6 +1336,24 @@ async def on_startup():
     await db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
     await db.briefs.create_index("brief_id", unique=True)
     await db.briefs.create_index([("user_id", 1), ("updated_at", -1)])
+    await db.briefs.create_index([("user_id", 1), ("profile_id", 1)])
+    await db.profiles.create_index("profile_id", unique=True)
+    await db.profiles.create_index([("user_id", 1), ("is_self", -1)])
+
+    # One-off backfill: give every user a self profile, and every brief that
+    # predates family profiles a profile_id (mapped to its owner's self).
+    async for u in db.users.find({}, {"_id": 0}):
+        await _ensure_self_profile(u)
+    async for b in db.briefs.find({"profile_id": {"$exists": False}}, {"_id": 0}):
+        owner = await db.users.find_one({"user_id": b["user_id"]}, {"_id": 0})
+        if not owner:
+            continue
+        self_prof = await _ensure_self_profile(owner)
+        await db.briefs.update_one(
+            {"brief_id": b["brief_id"]},
+            {"$set": {"profile_id": self_prof["profile_id"]}},
+        )
+
     try:
         await run_in_threadpool(init_storage)
         logger.info("Object storage initialized.")

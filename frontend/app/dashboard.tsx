@@ -1,8 +1,10 @@
-import { useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -11,12 +13,21 @@ import { Image } from "expo-image";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ScrollView as GHScrollView } from "react-native-gesture-handler";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Brief, briefs, DOC_TYPES } from "@/src/api/briefs";
 import { getFileUrl } from "@/src/api/client";
+import {
+  initialsFromName,
+  Profile,
+  profiles as profilesApi,
+  RELATIONSHIP_ICONS,
+  RELATIONSHIP_LABELS,
+} from "@/src/api/profiles";
 import { useAuth } from "@/src/auth/AuthContext";
 import { useSubscription } from "@/src/lib/revenuecat";
+import { useProfiles } from "@/src/profiles/ProfileContext";
 import { colors, radius, spacing } from "@/src/theme";
 
 const CLIPBOARD_IMG =
@@ -50,29 +61,36 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const { user, signOut } = useAuth();
   const { isSubscribed } = useSubscription();
+  const {
+    profiles,
+    self,
+    activeProfile,
+    setActiveProfile,
+    refresh: refreshProfiles,
+  } = useProfiles();
+
+  const activeId = activeProfile?.profile_id ?? null;
 
   const listQuery = useQuery({
-    queryKey: ["briefs"],
-    queryFn: () => briefs.list(),
+    queryKey: ["briefs", activeId ?? "all"],
+    queryFn: () => briefs.list(activeId),
+    enabled: !!activeId,
   });
 
   useFocusEffect(
     useCallback(() => {
       queryClient.invalidateQueries({ queryKey: ["briefs"] });
+      queryClient.invalidateQueries({ queryKey: ["profiles"] });
     }, [queryClient]),
   );
 
-  const initials = (user?.name ?? user?.email ?? "A")
-    .split(" ")
-    .map((s) => s.trim()[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
   const items = listQuery.data ?? [];
   const openPaywall = (trigger: string) => router.push(`/paywall?trigger=${trigger}`);
-  const createBrief = () => router.push("/capture");
+
+  const createBrief = () => {
+    if (!activeId) return;
+    router.push(`/capture?profile_id=${activeId}`);
+  };
 
   const openBrief = (b: Brief) => {
     if (b.content && b.status === "complete") {
@@ -81,6 +99,45 @@ export default function Dashboard() {
       router.push(`/brief-draft?brief_id=${b.brief_id}`);
     }
   };
+
+  const [pickerFor, setPickerFor] = useState<Profile | null>(null);
+
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => profilesApi.del(id),
+    onSuccess: async () => {
+      setPickerFor(null);
+      await refreshProfiles();
+      queryClient.invalidateQueries({ queryKey: ["briefs"] });
+    },
+  });
+
+  const handleSwitch = async (p: Profile) => {
+    if (!p.is_self && !isSubscribed) {
+      // Non-self profiles are visible on free tier but only tappable for the self.
+      openPaywall("family-profiles");
+      return;
+    }
+    await setActiveProfile(p.profile_id);
+  };
+
+  const handleAdd = () => {
+    if (!isSubscribed) {
+      openPaywall("family-profiles");
+      return;
+    }
+    router.push("/profile-add");
+  };
+
+  const orderedProfiles = useMemo(() => {
+    // Self first
+    return [...profiles].sort((a, b) => (a.is_self ? -1 : b.is_self ? 1 : 0));
+  }, [profiles]);
+
+  const initials = initialsFromName(user?.name ?? user?.email ?? "You");
+
+  const activeSubtitle = activeProfile
+    ? `${RELATIONSHIP_LABELS[activeProfile.relationship]} · ${activeProfile.name}`
+    : "";
 
   const renderHeader = () => (
     <>
@@ -102,10 +159,9 @@ export default function Dashboard() {
         </Text>
         <Text style={styles.heroText}>
           {items.length === 0
-            ? "Snap your first referral or lab result to generate a doctor-ready 1-page summary."
-            : "Keep drafting, or start a new brief for your next visit."}
+            ? `Snap ${activeProfile?.is_self ? "your" : (activeProfile?.name || "their")} first document to generate a doctor-ready 1-page summary.`
+            : "Keep drafting, or start a new brief for the next visit."}
         </Text>
-
         {!isSubscribed ? (
           <View style={styles.lockedRow} testID="dashboard-locked-features">
             {LOCKED_FEATURES.map((f) => (
@@ -125,7 +181,9 @@ export default function Dashboard() {
       </View>
 
       {items.length > 0 ? (
-        <Text style={styles.listLabel}>Your briefs</Text>
+        <Text style={styles.listLabel}>
+          {activeProfile?.is_self ? "Your briefs" : `${activeProfile?.name}'s briefs`}
+        </Text>
       ) : null}
     </>
   );
@@ -166,7 +224,7 @@ export default function Dashboard() {
             )}
           </View>
           <Text style={styles.cardMeta} numberOfLines={1}>
-            {item.photos.length} photo{item.photos.length === 1 ? "" : "s"} • {relativeTime(item.updated_at)}
+            {item.photos.length} photo{item.photos.length === 1 ? "" : "s"} · {relativeTime(item.updated_at)}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.muted} />
@@ -182,7 +240,7 @@ export default function Dashboard() {
         <View style={styles.headerLeft}>
           <Text style={styles.brand} testID="dashboard-brand">Anteroom</Text>
           <Text style={styles.greeting} numberOfLines={1}>
-            Hi{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
+            {activeSubtitle}
           </Text>
         </View>
         <View style={styles.headerRight}>
@@ -207,10 +265,72 @@ export default function Dashboard() {
             style={styles.avatar}
             hitSlop={8}
           >
-            <Text style={styles.avatarText}>{initials || "A"}</Text>
+            <Text style={styles.avatarText}>{initials}</Text>
           </Pressable>
         </View>
       </View>
+
+      {/* Family strip */}
+      <GHScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.stripContent}
+        style={styles.strip}
+      >
+        {orderedProfiles.map((p) => {
+          const selected = p.profile_id === activeId;
+          const locked = !p.is_self && !isSubscribed;
+          const isSelf = p.is_self;
+          return (
+            <View key={p.profile_id} style={styles.stripItem}>
+              <Pressable
+                testID={`profile-chip-${p.profile_id}`}
+                onPress={() => handleSwitch(p)}
+                onLongPress={() => (isSelf ? router.push(`/profile-add?profile_id=${p.profile_id}`) : setPickerFor(p))}
+                style={[
+                  styles.avatarChip,
+                  selected && styles.avatarChipSelected,
+                  locked && styles.avatarChipLocked,
+                ]}
+              >
+                <Text style={styles.avatarChipText}>{initialsFromName(p.name)}</Text>
+                {locked ? (
+                  <View style={styles.lockBadge}>
+                    <Ionicons name="lock-closed" size={9} color="#fff" />
+                  </View>
+                ) : null}
+              </Pressable>
+              <Text
+                style={[
+                  styles.stripLabel,
+                  selected && { color: colors.brandPrimary, fontWeight: "700" },
+                ]}
+                numberOfLines={1}
+              >
+                {isSelf ? "You" : p.name}
+              </Text>
+              {!isSelf ? (
+                <Text style={styles.stripRel} numberOfLines={1}>
+                  {RELATIONSHIP_LABELS[p.relationship]}
+                </Text>
+              ) : null}
+            </View>
+          );
+        })}
+        <View style={styles.stripItem}>
+          <Pressable
+            testID="profile-chip-add"
+            onPress={handleAdd}
+            style={styles.avatarAdd}
+          >
+            <Ionicons name="add" size={22} color={colors.brandPrimary} />
+          </Pressable>
+          <Text style={styles.stripLabel}>Add</Text>
+          <Text style={styles.stripRel}>
+            {isSubscribed ? "Member" : "Pro"}
+          </Text>
+        </View>
+      </GHScrollView>
 
       <FlatList
         data={items}
@@ -240,9 +360,59 @@ export default function Dashboard() {
           onPress={createBrief}
         >
           <Ionicons name="camera-outline" size={20} color={colors.onBrandPrimary} />
-          <Text style={styles.primaryBtnText}>Create a brief</Text>
+          <Text style={styles.primaryBtnText}>
+            Create {activeProfile?.is_self ? "your" : (activeProfile?.name || "a")} brief
+          </Text>
         </Pressable>
       </View>
+
+      {/* Profile actions modal */}
+      <Modal
+        visible={!!pickerFor}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPickerFor(null)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setPickerFor(null)} />
+        <View
+          style={[
+            styles.modalSheet,
+            { paddingBottom: insets.bottom + spacing.md },
+          ]}
+        >
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>{pickerFor?.name}</Text>
+          <Text style={styles.modalSubtitle}>
+            {pickerFor ? RELATIONSHIP_LABELS[pickerFor.relationship] : ""}
+          </Text>
+          <Pressable
+            testID="profile-modal-edit"
+            style={styles.modalRow}
+            onPress={() => {
+              const id = pickerFor?.profile_id;
+              setPickerFor(null);
+              if (id) router.push(`/profile-add?profile_id=${id}`);
+            }}
+          >
+            <Ionicons name="create-outline" size={18} color={colors.onSurface} />
+            <Text style={styles.modalRowText}>Edit profile</Text>
+          </Pressable>
+          <Pressable
+            testID="profile-modal-delete"
+            style={[styles.modalRow, { borderBottomWidth: 0 }]}
+            onPress={() => {
+              const id = pickerFor?.profile_id;
+              if (id) removeMutation.mutate(id);
+            }}
+            disabled={removeMutation.isPending}
+          >
+            <Ionicons name="trash-outline" size={18} color={colors.error} />
+            <Text style={[styles.modalRowText, { color: colors.error }]}>
+              {removeMutation.isPending ? "Removing…" : "Remove & archive briefs"}
+            </Text>
+          </Pressable>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -312,6 +482,68 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
   },
+  // Family strip
+  strip: {
+    maxHeight: 96,
+  },
+  stripContent: {
+    paddingHorizontal: spacing.xl,
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  stripItem: { alignItems: "center", width: 68, gap: 2 },
+  avatarChip: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.brandTertiary,
+    borderWidth: 2,
+    borderColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarChipSelected: {
+    borderColor: colors.brandPrimary,
+  },
+  avatarChipLocked: {
+    opacity: 0.55,
+  },
+  avatarChipText: {
+    color: colors.brandPrimary,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  lockBadge: {
+    position: "absolute",
+    right: -2,
+    top: -2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.brandPrimary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarAdd: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stripLabel: {
+    color: colors.onSurface,
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 4,
+    maxWidth: 68,
+  },
+  stripRel: { color: colors.muted, fontSize: 10 },
+  // List content (below strip)
   listContent: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
@@ -319,11 +551,11 @@ const styles = StyleSheet.create({
   hero: {
     alignItems: "center",
     gap: spacing.md,
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.md,
   },
   imageWrap: {
-    width: 140,
-    height: 140,
+    width: 120,
+    height: 120,
     borderRadius: radius.lg,
     backgroundColor: colors.brandTertiary,
     overflow: "hidden",
@@ -450,4 +682,43 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.85 },
   primaryBtnText: { color: colors.onBrandPrimary, fontSize: 16, fontWeight: "700" },
+  // Modal
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(17,24,21,0.5)",
+  },
+  modalSheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+  },
+  modalHandle: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    marginBottom: spacing.md,
+  },
+  modalTitle: {
+    color: colors.onSurface,
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  modalSubtitle: { color: colors.muted, fontSize: 13, marginBottom: spacing.md },
+  modalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  modalRowText: { color: colors.onSurface, fontSize: 16, fontWeight: "600" },
 });

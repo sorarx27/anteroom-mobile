@@ -10,6 +10,7 @@ import { ErrorBoundary } from "@/src/components/error-boundary";
 import { queryClient } from "@/src/query-client";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
 import { SubscriptionProvider, initializeRevenueCat } from "@/src/lib/revenuecat";
+import { ProfileProvider } from "@/src/profiles/ProfileContext";
 
 LogBox.ignoreAllLogs(true);
 
@@ -62,16 +63,18 @@ export default function RootLayout() {
           <QueryClientProvider client={queryClient}>
             <SubscriptionProvider>
               <AuthProvider>
-                <StatusBar style="auto" />
-                <AuthGate>
-                  <Stack
-                    screenOptions={{
-                      headerShown: false,
-                      animation: "fade",
-                      contentStyle: { backgroundColor: "#FFFFFF" },
-                    }}
-                  />
-                </AuthGate>
+                <ProfileProvider>
+                  <StatusBar style="auto" />
+                  <AuthGate>
+                    <Stack
+                      screenOptions={{
+                        headerShown: false,
+                        animation: "fade",
+                        contentStyle: { backgroundColor: "#FFFFFF" },
+                      }}
+                    />
+                  </AuthGate>
+                </ProfileProvider>
               </AuthProvider>
             </SubscriptionProvider>
           </QueryClientProvider>

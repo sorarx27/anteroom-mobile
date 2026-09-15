@@ -1,0 +1,30 @@
+{
+  "summary": "Backend Pro Translation feature verified end-to-end. All 13 pytest cases PASS in 31s against the live preview backend. POST /api/briefs/{id}/translate correctly (a) rejects unauthenticated calls (401), unknown briefs (404), invalid target_language 'fr' (400 with helpful detail), and briefs that haven't been generated yet (400 'Brief has not been generated yet'); (b) no-ops when target==source_language; (c) translates EN→ES and caches under content_translations.es with byte-for-byte identical patient.name/dob/id_number and medications[*].name/dose (verbatim rule preserved by _sanitize_like_input); (d) second identical call is served from cache in <5s with identical payload; (e) response BriefOut exposes source_language='en' and available_languages=['en','es']. GET /api/briefs/{id}/pdf?lang=es and ?lang=en both return application/pdf bytes starting with %PDF; ?lang=fr silently falls back to source and still returns a valid PDF. GET /api/public/briefs/{share_token} defaults to English titles (Patient/Medications/Allergies); ?lang=es returns Spanish titles (Paciente/Medicamentos/Alergias) and the language switcher chip strip (class=\"lang\" with ?lang=en and ?lang=es anchors) is rendered when a translation is cached. Fresh generate response confirmed source_language='en', content_translations=None/{}, available_languages=['en']. Frontend NOT tested per request (user will verify manually).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_translation.py",
+    "/app/test_reports/pytest/pytest_translation.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py:1049-1053 (_public_share_url) — duplicate `base = str(request.base_url).rstrip('/')` and `return ...` after the first return. Dead code; harmless but should be removed.",
+    "server.py:996 translate_brief — HTTPException on translation failure returns 502 'Translation failed' (opaque). Consider including a request-id / brief-id for support triage. Not a bug, just observability.",
+    "brieftranslator.py — good defensive handling: _sanitize_like_input forces source-of-truth for patient.name/dob/id_number and medications[*], which is what the tests verified byte-for-byte. Nice.",
+    "server.py translate endpoint — content_translations is serialized as `None` on the wire when empty (BriefOut default None) rather than `{}`; tests accept both, but the spec on line 4 of test_result.md says content_translations={}. Frontend should treat null and {} equivalently."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_translation.py (new file)"
+  ],
+  "success_rate": {"backend": "100% (13/13 pytest cases)", "frontend": "not tested (per request)"},
+  "seed_data_creation": "During the run, a handful of transient briefs were created on test1@anteroom.dev (1 generated referral brief re-used across the module + 1 un-generated brief for the 400 path). These are normal user data and can remain; they are scoped to the test1 account only.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend translation flow is fully green. If retest is needed, run: EXPO_PUBLIC_BACKEND_URL=<preview_url> pytest /app/backend/tests/test_translation.py -v. The suite is self-contained (logs in as test1@anteroom.dev, synthesizes a referral PNG with PIL, generates, translates, asserts). Second-call caching threshold is <5s — tighten to <2s only if you also add a mock; the current threshold caught real cache hits ~0.4s.",
+  "rca_of_issue": "No bugs found. Feature implementation matches the spec: source_language locked at generate-time, LLM translation gated behind cache lookup, verbatim rules enforced by _sanitize_like_input on the server (LLM output never wins on name/dob/id_number/med.name/med.dose), PDF renderer localizes section titles and falls back gracefully on unknown lang, public share page localizes titles and only shows the language-chip strip when >1 language is available."
+}

@@ -1,0 +1,33 @@
+{
+  "summary": "Backend (19/19 passing) fully covers family-profile CRUD, brief scoping, cross-user 404s, self-protection, and startup backfill. Frontend: /profile-add screen renders with all required testIDs, Save is correctly disabled on empty name, and Save on a NEW profile as free user correctly routes to /paywall. CRITICAL frontend bug: tapping the dashboard 'profile-chip-add' (+ chip) as a free user does NOT navigate to /paywall (page stays on /dashboard). Tapping a NON-SELF profile chip on the dashboard also does NOT navigate to /paywall. Tapping the Self chip works and the brief list is correctly filtered per active profile. Data integrity works: after deleting a non-self profile via API its brief is soft-archived (returns 404 on GET, absent from list, absent from Self dashboard).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Dashboard family strip - Pressable chip", "issue": "Free user tap on 'profile-chip-add' does NOT navigate to /paywall. URL stays on /dashboard and no paywall-screen renders. Same handler openPaywall() fires correctly from /profile-add Save (router.replace) but not from dashboard chip (router.push). Likely react-native-web Pressable inside horizontal ScrollView swallowing onPress, OR the router.push happens but is being ignored/redirected back on web. Reference: /app/frontend/app/dashboard.tsx:322 (handleAdd) and line 287 (handleSwitch).", "testID": "profile-chip-add", "priority": "HIGH"},
+      {"component": "Dashboard family strip - non-self chip tap", "issue": "Free user tap on a non-self profile chip (e.g. profile-chip-<partner_id>) does NOT navigate to /paywall. handleSwitch is expected to call openPaywall('family-profiles') but no navigation occurs. Reference: /app/frontend/app/dashboard.tsx:113-120.", "testID": "profile-chip-<partner_id>", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "Pressable prop", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents'. Likely coming from a library or a View. Not blocking. Reference: emitted while rendering /profile-add."}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_family_profiles.py", "/app/test_reports/pytest/pytest_family_profiles.xml"],
+  "action_items": [
+    "Fix dashboard chip taps: tapping 'profile-chip-add' as free user must router.push('/paywall?trigger=family-profiles'). Tapping a non-self chip as free user must do the same. Currently the tap fires no navigation. Suggest: (a) verify Pressable inside horizontal ScrollView on react-native-web actually receives onPress (try onPressIn or Pressable's `role='button'`), (b) try using router.replace or router.navigate, (c) as a debug step, log inside handleAdd/handleSwitch to confirm they're invoked at all. The Save button on /profile-add correctly navigates via router.replace, so router itself works.",
+    "Investigate whether Pressable's combined onPress + onLongPress on web causes onPress to be dropped in this ScrollView context.",
+    "Address 'props.pointerEvents is deprecated' warning."
+  ],
+  "critical_code_review_comments": [
+    "server.py > _ensure_self_profile: uses `user.get('dob')` for the self profile dob — good. But note it only sets dob at self-creation time; later updates to user.dob (via PUT /api/auth/profile) will not sync to the self profile.dob. Consider syncing or documenting.",
+    "server.py delete_profile_endpoint hard-fails on self with 400 — matches spec.",
+    "ProfileContext hydration uses `hydrated.current` guard on profiles load — good, but if the persisted active_profile_id points to a since-archived profile it silently falls back to self (correct behaviour)."
+  ],
+  "updated_files": ["/app/backend/tests/test_family_profiles.py"],
+  "success_rate": {"backend": "100%", "frontend": "~70% (2 HIGH-priority chip navigation bugs)"},
+  "seed_data_creation": "Multiple qa_*@anteroom.dev accounts registered via /api/auth/register during pytest run. On test1@anteroom.dev: created transient 'Nora QA' and 'Nora QA2' partner profiles + briefs; partner profile 'Nora QA2' (prof_6cec9ab00b3d) was DELETE-archived at end of frontend run. 'Nora QA' (prof_85dec95886dc) may still be present on test1@anteroom.dev — main agent may want to clean up.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend tests are stable. Focus retest on the two dashboard chip navigation bugs. Use test1@anteroom.dev/password123 (free tier). Steps: 1) sign in, wait dashboard-screen, 2) tap [data-testid=profile-chip-add] and confirm URL becomes /paywall?trigger=family-profiles and [data-testid=paywall-screen] renders. 3) Seed a non-self profile via POST /api/profiles with Authorization: Bearer <token from localStorage anteroom_session_token>. Reload dashboard, tap that new profile-chip-<id> and confirm same paywall navigation.",
+  "rca_of_issue": "Symptom: On dashboard, tap on profile-chip-add (or any non-self chip) as free user does nothing – no navigation, no error. Reproduction: sign in test1@anteroom.dev, tap the dashed + chip in horizontal family strip. Expected: navigate to /paywall?trigger=family-profiles. Actual: URL stays /dashboard. Note: identical openPaywall path works from /profile-add Save button (router.replace) and from the 'Upgrade' header button on dashboard uses same openPaywall via router.push — need to confirm if upgrade button navigates OK to isolate whether it's Pressable-in-ScrollView or router.push-from-dashboard. Suggested mitigation: (a) add console.log in handleAdd and handleSwitch to verify handler runs, (b) if handler runs, replace router.push with router.navigate or router.replace, (c) if handler does NOT run, migrate the strip Pressable from inside <ScrollView horizontal> to a <FlatList horizontal> or add hitSlop / delayLongPress to isolate onPress from onLongPress."
+}
