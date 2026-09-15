@@ -1,0 +1,37 @@
+{
+  "summary": "Doc-type auto-detect feature (Gemini 3.5 Flash) verified end-to-end. Backend: 9/9 pytest tests pass in /app/backend/tests/test_docdetect.py covering (1) schema exposure of doc_type_manual_override + detected_doc_type + detected_confidence with no _id/storage_path leaks, (2) first-photo upload triggers async classification (a synthesized lab-report PNG was correctly classified as lab_result / high confidence within ~4-8s), (3) second-photo upload on the same brief does NOT re-run classifier (detected_* preserved), (4) manual PATCH doc_type sets doc_type_manual_override=true and blocks subsequent auto-detect from overwriting doc_type while detected_* remain from the first photo, (5) POST /briefs/{id}/detect-doc-type reruns classifier and clears the override flag, returns 400 when brief has no photos, returns 401 without Bearer, returns 404 when the brief belongs to another user. Frontend: Playwright script signed in, opened /brief-draft?brief_id=<detected>, confirmed testID 'brief-detection-hint' renders literal text 'Detected: Lab result — tap a chip to change'; tapping testID 'brief-doctype-referral' hides the hint AND flips backend doc_type_manual_override to true; tapping testID 'brief-redetect-btn' shows label 'Detecting…' then the hint reappears with fresh result and backend override flag returns to false. On a brief with zero photos, the redetect button correctly has aria-disabled='true' and the detection hint is not rendered. Detected labels map correctly (med_list -> 'Med list', lab_result -> 'Lab result', referral -> 'Referral', other -> 'Other'). No React Native or Expo deprecation issues seen in the touched code.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/brief-draft", "issues": ["'Detect' button uses opacity 0.55 to indicate disabled; aria-disabled is exposed but there is no visible disabled tooltip/help text. Minor UX polish only."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_docdetect.py",
+    "/app/backend/tests/test_briefs.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "None blocking. (Optional) Consider running the classifier even when doc_type_manual_override was set before any photo was attached, so detected_* is still populated for user reference — currently server.py:512-518 skips detection entirely in that edge case. Not covered by the spec, and the intended user flow is 'upload -> detect -> user overrides', so this is only a defensive improvement."
+  ],
+  "critical_code_review_comments": [
+    "server.py: _auto_classify_brief re-reads the brief before writing, but between find_one and update_one the user could have PATCHed doc_type_manual_override=true. There is a small race window where the classifier's doc_type write could clobber a user override that happened during the ~2-4s classification. Consider adding a conditional update: db.briefs.update_one({'brief_id': brief_id, 'doc_type_manual_override': False}, {...}) for the doc_type field specifically. Detected_* fields are safe to always overwrite.",
+    "docclassifier.py: catches all exceptions and defaults to {'other','low'}. Good fallback, but the failure is silently absorbed; the frontend hint will show 'Detected: Other (low confidence)' with no way for the user to know classification actually errored. Consider adding a 'detection_error' boolean or telemetry event.",
+    "brief-draft.tsx: redetect() sets detecting=true optimistically but does not toggle overrides in local state — final state comes only from backend response. This is correct but means the chip selection briefly stays on the manually-picked chip during 'Detecting…'. Optional UX: dim chips during redetect."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_docdetect.py (new)"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% — all four frontend requirements verified via Playwright (hint render, chip tap hides hint + sets override, redetect shows Detecting… and reappears clearing override, redetect disabled when photoCount==0)"},
+  "seed_data_creation": "Created two briefs under test1@anteroom.dev: brief_880ec37bd301 (lab-report PNG uploaded, detected_doc_type=lab_result, confidence=high) and brief_c0b1d1f7df06 (empty, for disabled-button test). Registered one ephemeral qa_{ts}_detect_b@anteroom.dev for cross-user isolation test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Auth screen defaults to 'Create your account' mode — click text 'Sign in' before submitting credentials. Use page.get_by_text('Sign in', exact=True).last to hit the primary submit button (the toggle 'Sign in' link is only shown when in Create mode, so after switching there is exactly one match). Gemini 3.5 Flash classifier takes ~2-8s cold, so poll GET /briefs/{id} with interval=2s / timeout=20s. For image content, use PIL to synthesize a lab report with visible text — a blank/1x1 PNG returns 'other'/'low' from the classifier and won't exercise the confidence branches.",
+  "rca_of_issue": "N/A — no functional bugs found."
+}

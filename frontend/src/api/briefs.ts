@@ -12,6 +12,9 @@ export type Brief = {
   brief_id: string;
   user_id: string;
   doc_type: "referral" | "med_list" | "lab_result" | "other";
+  doc_type_manual_override: boolean;
+  detected_doc_type: "referral" | "med_list" | "lab_result" | "other" | null;
+  detected_confidence: "low" | "medium" | "high" | null;
   status: "draft" | "complete";
   photos: BriefPhoto[];
   created_at: string;
@@ -49,4 +52,6 @@ export const briefs = {
   ) => apiUpload<Brief>(`/briefs/${brief_id}/photos`, file),
   deletePhoto: (brief_id: string, photo_id: string) =>
     api.del<Brief>(`/briefs/${brief_id}/photos/${photo_id}`),
+  detectDocType: (brief_id: string) =>
+    api.post<Brief>(`/briefs/${brief_id}/detect-doc-type`),
 };

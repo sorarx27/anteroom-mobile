@@ -16,6 +16,8 @@ import bcrypt
 import httpx
 
 from storage import init_storage, put_object, get_object, StorageError, APP_NAME
+from docclassifier import classify_image
+import asyncio
 
 
 ROOT_DIR = Path(__file__).parent
@@ -299,6 +301,9 @@ class BriefOut(BaseModel):
     brief_id: str
     user_id: str
     doc_type: str
+    doc_type_manual_override: bool = False
+    detected_doc_type: Optional[str] = None
+    detected_confidence: Optional[str] = None
     status: str  # 'draft' | 'complete'
     photos: List[BriefPhotoOut]
     created_at: datetime
@@ -331,6 +336,9 @@ def _brief_to_out(doc: dict) -> BriefOut:
         brief_id=doc["brief_id"],
         user_id=doc["user_id"],
         doc_type=doc.get("doc_type", "other"),
+        doc_type_manual_override=bool(doc.get("doc_type_manual_override", False)),
+        detected_doc_type=doc.get("detected_doc_type"),
+        detected_confidence=doc.get("detected_confidence"),
         status=doc.get("status", "draft"),
         photos=photos,
         created_at=doc["created_at"],
@@ -350,6 +358,9 @@ async def create_brief(
         "brief_id": f"brief_{uuid.uuid4().hex[:12]}",
         "user_id": user["user_id"],
         "doc_type": doc_type,
+        "doc_type_manual_override": False,
+        "detected_doc_type": None,
+        "detected_confidence": None,
         "status": "draft",
         "photos": [],
         "created_at": now,
@@ -400,6 +411,9 @@ async def update_brief(
         if dt not in DOC_TYPES:
             raise HTTPException(status_code=400, detail="Invalid doc_type")
         updates["doc_type"] = dt
+        # A manual PATCH of doc_type flags the brief as user-overridden so
+        # background auto-detect stops touching it.
+        updates["doc_type_manual_override"] = True
     if payload.status is not None:
         if payload.status not in ("draft", "complete"):
             raise HTTPException(status_code=400, detail="Invalid status")
@@ -491,6 +505,94 @@ async def upload_brief_photo(
     )
     doc["photos"] = list(doc.get("photos", [])) + [photo]
     doc["updated_at"] = datetime.now(timezone.utc)
+
+    # Only run auto-detect for the FIRST photo (or when nothing has been
+    # detected yet) and only if the user has NOT manually overridden the
+    # doc-type. Later photos on the same brief keep the existing type.
+    has_prior_photos = any(
+        p for p in doc["photos"][:-1] if not p.get("deleted_at")
+    )
+    should_auto_detect = (
+        not doc.get("doc_type_manual_override", False)
+        and (not has_prior_photos or not doc.get("detected_doc_type"))
+    )
+    if should_auto_detect:
+        asyncio.create_task(
+            _auto_classify_brief(brief_id, data, content_type)
+        )
+
+    return _brief_to_out(doc)
+
+
+async def _auto_classify_brief(brief_id: str, image_bytes: bytes, content_type: str) -> None:
+    """Background task: classify the image and, if not overridden, update doc_type."""
+    try:
+        result = await classify_image(image_bytes, content_type)
+        now = datetime.now(timezone.utc)
+        # Always persist the detected value + confidence for the hint.
+        await db.briefs.update_one(
+            {"brief_id": brief_id, "deleted_at": None},
+            {
+                "$set": {
+                    "detected_doc_type": result["doc_type"],
+                    "detected_confidence": result["confidence"],
+                    "updated_at": now,
+                }
+            },
+        )
+        # Only write doc_type when the user has NOT overridden it. Conditional
+        # match closes the race where a manual PATCH sneaks in during classify.
+        effective = (
+            result["doc_type"] if result["confidence"] != "low" else "other"
+        )
+        await db.briefs.update_one(
+            {
+                "brief_id": brief_id,
+                "deleted_at": None,
+                "doc_type_manual_override": False,
+            },
+            {"$set": {"doc_type": effective, "updated_at": now}},
+        )
+    except Exception as e:
+        logger.exception("Auto-classify failed for brief %s: %s", brief_id, e)
+
+
+@api_router.post("/briefs/{brief_id}/detect-doc-type", response_model=BriefOut)
+async def detect_brief_doc_type(
+    brief_id: str, user: dict = Depends(get_current_user)
+):
+    """Re-run doc-type detection using the brief's first photo.
+
+    Clears any previous manual override — the user is explicitly asking the
+    model to try again.
+    """
+    doc = await db.briefs.find_one(
+        {"brief_id": brief_id, "user_id": user["user_id"], "deleted_at": None},
+        {"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Brief not found")
+    photos = [p for p in doc.get("photos", []) if not p.get("deleted_at")]
+    if not photos:
+        raise HTTPException(status_code=400, detail="Attach a photo first")
+    first = photos[0]
+    try:
+        image_bytes, ctype = await run_in_threadpool(get_object, first["storage_path"])
+    except Exception as e:
+        logger.exception("Fetching photo for detection failed: %s", e)
+        raise HTTPException(status_code=502, detail="Could not read photo")
+
+    result = await classify_image(image_bytes, ctype)
+    effective = result["doc_type"] if result["confidence"] != "low" else "other"
+    updates = {
+        "doc_type": effective,
+        "detected_doc_type": result["doc_type"],
+        "detected_confidence": result["confidence"],
+        "doc_type_manual_override": False,
+        "updated_at": datetime.now(timezone.utc),
+    }
+    await db.briefs.update_one({"brief_id": brief_id}, {"$set": updates})
+    doc.update(updates)
     return _brief_to_out(doc)
 
 

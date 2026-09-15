@@ -28,29 +28,60 @@ export default function BriefDraft() {
     queryKey: ["brief", brief_id],
     queryFn: () => briefs.get(brief_id!),
     enabled: !!brief_id,
+    // Poll while classification hasn't landed yet.
+    refetchInterval: (query) => {
+      const b = query.state.data as Brief | undefined;
+      if (!b) return 2000;
+      if (b.detected_doc_type === null && b.photos.length > 0) return 2500;
+      return false;
+    },
   });
 
   const brief = briefQuery.data;
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const docType = brief?.doc_type ?? "other";
   const photoCount = brief?.photos.length ?? 0;
+  const detectedLabel = useMemo(() => {
+    if (!brief?.detected_doc_type) return null;
+    return DOC_TYPES.find((d) => d.key === brief.detected_doc_type)?.label ?? "Other";
+  }, [brief?.detected_doc_type]);
+  const showDetectionHint =
+    !!brief &&
+    !brief.doc_type_manual_override &&
+    !!brief.detected_doc_type &&
+    photoCount > 0;
 
   const setBrief = (b: Brief) => queryClient.setQueryData(["brief", brief_id], b);
 
   const setDocType = async (dt: Brief["doc_type"]) => {
     if (!brief || dt === brief.doc_type) return;
     setError(null);
-    // optimistic
-    setBrief({ ...brief, doc_type: dt });
+    // optimistic — flip type AND set override so hint hides immediately
+    setBrief({ ...brief, doc_type: dt, doc_type_manual_override: true });
     try {
       const updated = await briefs.update(brief.brief_id, { doc_type: dt });
       setBrief(updated);
     } catch (e: any) {
       setError(e?.message ?? "Could not update doc type");
       setBrief(brief);
+    }
+  };
+
+  const redetect = async () => {
+    if (!brief || photoCount === 0 || detecting) return;
+    setError(null);
+    setDetecting(true);
+    try {
+      const updated = await briefs.detectDocType(brief.brief_id);
+      setBrief(updated);
+    } catch (e: any) {
+      setError(e?.message ?? "Could not detect doc type");
+    } finally {
+      setDetecting(false);
     }
   };
 
@@ -147,7 +178,49 @@ export default function BriefDraft() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Document type</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionLabel}>Document type</Text>
+            <Pressable
+              testID="brief-redetect-btn"
+              onPress={redetect}
+              disabled={photoCount === 0 || detecting}
+              style={[
+                styles.detectBtn,
+                (photoCount === 0 || detecting) && styles.detectBtnDim,
+              ]}
+              hitSlop={6}
+            >
+              {detecting ? (
+                <ActivityIndicator color={colors.brandPrimary} size="small" />
+              ) : (
+                <Ionicons
+                  name="sparkles"
+                  size={13}
+                  color={colors.brandPrimary}
+                />
+              )}
+              <Text style={styles.detectBtnText}>
+                {detecting ? "Detecting…" : "Detect"}
+              </Text>
+            </Pressable>
+          </View>
+          {showDetectionHint ? (
+            <Pressable
+              testID="brief-detection-hint"
+              onPress={() => {}}
+              style={styles.hintRow}
+            >
+              <Ionicons name="sparkles" size={14} color={colors.brandPrimary} />
+              <Text style={styles.hintText}>
+                Detected:{" "}
+                <Text style={styles.hintTextBold}>{detectedLabel}</Text>
+                {brief?.detected_confidence === "low"
+                  ? " (low confidence)"
+                  : ""}
+                {"  "}— tap a chip to change
+              </Text>
+            </Pressable>
+          ) : null}
           <View style={styles.chipsRow}>
             {DOC_TYPES.map((dt) => {
               const selected = docType === dt.key;
@@ -346,6 +419,42 @@ const styles = StyleSheet.create({
   },
   chipText: { color: colors.onSurfaceSecondary, fontSize: 13, fontWeight: "600" },
   chipTextSelected: { color: colors.brandPrimary },
+  detectBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brandTertiary,
+    borderWidth: 1,
+    borderColor: colors.brandSecondary,
+  },
+  detectBtnDim: { opacity: 0.55 },
+  detectBtnText: {
+    color: colors.brandPrimary,
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+  hintRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    backgroundColor: colors.brandTertiary,
+    borderWidth: 1,
+    borderColor: colors.brandSecondary,
+  },
+  hintText: {
+    color: colors.onSurface,
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 18,
+  },
+  hintTextBold: { fontWeight: "700", color: colors.brandPrimary },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
