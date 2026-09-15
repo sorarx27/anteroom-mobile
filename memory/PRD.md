@@ -29,8 +29,29 @@ Mobile app that turns messy medical papers into a doctor-ready 1-page pre-visit 
 
 ## Non-goals (deferred)
 - Family profiles UI beyond gating (done)
-- Backend refactoring — `server.py` still ~1400 lines; splitting into routers/ is P2
 - Reorder gestures (backend supports it; UI still to come)
+
+## Backend layout (post-refactor)
+```
+backend/
+  server.py                 # 100-line FastAPI entry: mounts routers, indexes, backfill
+  db.py                     # Mongo client + shared config constants
+  deps.py                   # Auth deps (get_current_user, resolve_user_from_bearer_or_token, session helpers, model mappers)
+  models.py                 # All Pydantic request/response models
+  services/
+    profiles.py             # ensure_self_profile, validate_dob, RELATIONSHIPS
+    share_html.py           # Public share HTML rendering + i18n labels
+  routers/
+    auth.py                 # /auth/* — register, login, google session, me, logout, profile
+    profiles.py             # /profiles CRUD
+    briefs.py               # /briefs CRUD, photos, detect, generate, translate, pdf
+    public.py               # /public/briefs/{token} share view
+  briefgen.py               # Gemini 3.1 Pro Preview extraction (unchanged)
+  brieftranslator.py        # Gemini 3.1 Pro Preview translation (unchanged)
+  briefpdf.py               # ReportLab renderer (unchanged)
+  docclassifier.py          # Gemini 3.5 Flash classifier (unchanged)
+  storage.py                # Emergent Object Storage (unchanged)
+```
 
 ## Tech
 - Expo Router (SDK 57), React Native
