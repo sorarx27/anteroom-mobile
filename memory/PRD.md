@@ -11,8 +11,14 @@ Mobile app that turns messy medical papers into a doctor-ready 1-page pre-visit 
 5. Dashboard with brief list + hero + locked-feature chips (free) + PRO badge (paid) + "Create a brief" CTA
 6. RevenueCat paywall (`/paywall`) — monthly (€2.99) + annual (€29.99), restore, `pro` entitlement gates
 7. Document capture (`/capture`) — take photo OR pick from gallery (multi-select), upload each to Emergent Object Storage against the user's draft brief
-8. Brief draft review (`/brief-draft?brief_id=…`) — photo grid + delete + doc-type chips + Save/Discard
-9. **Doc-type auto-detect** — after the first photo lands, the backend classifies it with **Gemini 3.5 Flash** in the background; `doc_type` snaps to the detected value (or `other` on low confidence). The review screen shows a "Detected: <label> — tap a chip to change" hint; tapping any chip flags a manual override so background detect no longer overwrites. A **Detect** button re-runs the classifier and clears the override.
+8. Brief draft review (`/brief-draft?brief_id=…`) — photo grid + delete + doc-type chips + Save/Discard + Generate CTA
+9. Doc-type auto-detect via Gemini 3.5 Flash with manual override + Detect button
+10. **AI Brief Generation** — Gemini 3.1 Pro Preview extracts patient info, referral reason, medications and allergies VERBATIM from the photos. Nothing is invented, unreadable/high-risk items go to `flagged_items`. Rendered in `/brief-view` with QR to public share page, plus a downloadable 1-page PDF (watermarked for free, clean for Pro).
+
+## Backend endpoints (new this iteration)
+- POST `/api/briefs/{id}/generate` — extract structured content with Gemini 3.1 Pro Preview, set status=complete, mint short-lived share_token (7 days)
+- GET  `/api/briefs/{id}/pdf?watermark=true|false&token=…` — server-rendered 1-page PDF via reportlab; client passes `watermark=false` when RC entitlement is active
+- GET  `/api/public/briefs/{share_token}` — unauthenticated HTML share page targeted by the QR code (mounted under /api so Kubernetes ingress reaches it)
 
 ## Non-goals (deferred)
 - Brief generation, PDF export, QR

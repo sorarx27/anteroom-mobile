@@ -75,7 +75,11 @@ export default function Dashboard() {
   const createBrief = () => router.push("/capture");
 
   const openBrief = (b: Brief) => {
-    router.push(`/brief-draft?brief_id=${b.brief_id}`);
+    if (b.content && b.status === "complete") {
+      router.push(`/brief-view?brief_id=${b.brief_id}`);
+    } else {
+      router.push(`/brief-draft?brief_id=${b.brief_id}`);
+    }
   };
 
   const renderHeader = () => (
@@ -155,7 +159,11 @@ export default function Dashboard() {
               <View style={styles.draftPill}>
                 <Text style={styles.draftPillText}>DRAFT</Text>
               </View>
-            ) : null}
+            ) : (
+              <View style={styles.readyPill}>
+                <Text style={styles.readyPillText}>READY</Text>
+              </View>
+            )}
           </View>
           <Text style={styles.cardMeta} numberOfLines={1}>
             {item.photos.length} photo{item.photos.length === 1 ? "" : "s"} • {relativeTime(item.updated_at)}
@@ -402,6 +410,19 @@ const styles = StyleSheet.create({
   },
   draftPillText: {
     color: colors.onWarning,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+  },
+  readyPill: {
+    marginLeft: spacing.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.success,
+  },
+  readyPillText: {
+    color: colors.onSuccess,
     fontSize: 9,
     fontWeight: "800",
     letterSpacing: 0.6,

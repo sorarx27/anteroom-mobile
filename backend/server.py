@@ -11,12 +11,14 @@ import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, List
+from typing import Optional, List, Any
 import bcrypt
 import httpx
 
 from storage import init_storage, put_object, get_object, StorageError, APP_NAME
 from docclassifier import classify_image
+from briefgen import generate_brief_content
+from briefpdf import render_brief_pdf
 import asyncio
 
 
@@ -306,6 +308,9 @@ class BriefOut(BaseModel):
     detected_confidence: Optional[str] = None
     status: str  # 'draft' | 'complete'
     photos: List[BriefPhotoOut]
+    content: Optional[dict] = None  # generated brief content
+    generated_at: Optional[datetime] = None
+    share_url_path: Optional[str] = None  # /public/briefs/{share_token}
     created_at: datetime
     updated_at: datetime
 
@@ -341,6 +346,13 @@ def _brief_to_out(doc: dict) -> BriefOut:
         detected_confidence=doc.get("detected_confidence"),
         status=doc.get("status", "draft"),
         photos=photos,
+        content=doc.get("content"),
+        generated_at=doc.get("generated_at"),
+        share_url_path=(
+            f"/api/public/briefs/{doc['share_token']}"
+            if doc.get("share_token")
+            else None
+        ),
         created_at=doc["created_at"],
         updated_at=doc["updated_at"],
     )
@@ -676,6 +688,243 @@ async def get_brief_photo_file(
         logger.exception("Storage download failed: %s", e)
         raise HTTPException(status_code=502, detail="Download failed")
     return Response(content=content, media_type=ctype)
+
+
+@api_router.post("/briefs/{brief_id}/generate", response_model=BriefOut)
+async def generate_brief(brief_id: str, user: dict = Depends(get_current_user)):
+    """Extract structured content from all attached photos with Gemini 3.1 Pro."""
+    doc = await db.briefs.find_one(
+        {"brief_id": brief_id, "user_id": user["user_id"], "deleted_at": None},
+        {"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Brief not found")
+    photos = [p for p in doc.get("photos", []) if not p.get("deleted_at")]
+    if not photos:
+        raise HTTPException(status_code=400, detail="Attach at least one photo first")
+
+    image_bytes: list[tuple[bytes, str]] = []
+    for p in photos[:10]:  # cap at 10 pages
+        try:
+            b, ct = await run_in_threadpool(get_object, p["storage_path"])
+        except Exception as e:
+            logger.exception("Photo fetch for brief-gen failed: %s", e)
+            raise HTTPException(status_code=502, detail="Could not read photos")
+        image_bytes.append((b, ct))
+
+    try:
+        content = await generate_brief_content(image_bytes)
+    except Exception as e:
+        logger.exception("Brief generation failed: %s", e)
+        raise HTTPException(status_code=502, detail="Brief generation failed")
+
+    now = datetime.now(timezone.utc)
+    share_token = doc.get("share_token") or uuid.uuid4().hex
+    share_expires_at = now + timedelta(days=7)
+    await db.briefs.update_one(
+        {"brief_id": brief_id},
+        {
+            "$set": {
+                "content": content,
+                "status": "complete",
+                "generated_at": now,
+                "share_token": share_token,
+                "share_expires_at": share_expires_at,
+                "updated_at": now,
+            }
+        },
+    )
+    doc.update(
+        {
+            "content": content,
+            "status": "complete",
+            "generated_at": now,
+            "share_token": share_token,
+            "share_expires_at": share_expires_at,
+            "updated_at": now,
+        }
+    )
+    return _brief_to_out(doc)
+
+
+def _public_share_url(request: Request, share_token: str) -> str:
+    base = str(request.base_url).rstrip("/")
+    return f"{base}/api/public/briefs/{share_token}"
+
+
+@api_router.get("/briefs/{brief_id}/pdf")
+async def get_brief_pdf(
+    brief_id: str,
+    request: Request,
+    watermark: bool = Query(default=True),
+    token: Optional[str] = Query(default=None),
+):
+    """Render the brief as a 1-page PDF. `watermark` controls the free-tier ribbon.
+
+    The client (which is the source of truth for Pro entitlement via
+    RevenueCat) passes `watermark=false` when the user is subscribed.
+    """
+    user = await _resolve_user_from_bearer_or_token(request, token)
+    doc = await db.briefs.find_one(
+        {"brief_id": brief_id, "user_id": user["user_id"], "deleted_at": None},
+        {"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Brief not found")
+    if not doc.get("content"):
+        raise HTTPException(status_code=400, detail="Brief has not been generated yet")
+
+    share_url = None
+    if doc.get("share_token"):
+        share_url = _public_share_url(request, doc["share_token"])
+    generated_at = doc.get("generated_at")
+    generated_at_str = generated_at.strftime("%Y-%m-%d %H:%M UTC") if generated_at else ""
+    pdf_bytes = await run_in_threadpool(
+        render_brief_pdf,
+        doc["content"],
+        doc_type_label=doc.get("doc_type", "other"),
+        generated_at=generated_at_str,
+        watermarked=watermark,
+        share_url=share_url or "",
+        brief_id=brief_id,
+    )
+    headers = {
+        "Content-Disposition": f'inline; filename="anteroom-brief-{brief_id}.pdf"'
+    }
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
+
+
+# ---- Public (unauthenticated) share view — mounted under /api so ingress reaches it ----
+@api_router.get("/public/briefs/{share_token}")
+async def public_brief_view(share_token: str):
+    doc = await db.briefs.find_one(
+        {"share_token": share_token, "deleted_at": None}, {"_id": 0}
+    )
+    if not doc or not doc.get("content"):
+        return Response(
+            content=_share_html_not_found(),
+            media_type="text/html",
+            status_code=404,
+        )
+    expires_at = doc.get("share_expires_at")
+    if expires_at:
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at < datetime.now(timezone.utc):
+            return Response(
+                content=_share_html_expired(),
+                media_type="text/html",
+                status_code=410,
+            )
+    html = _share_html(doc)
+    return Response(content=html, media_type="text/html")
+
+
+def _esc(v: Any) -> str:
+    import html
+    return html.escape(str(v)) if v is not None else ""
+
+
+def _share_html_not_found() -> str:
+    return _share_wrapper("Brief not found", "<p>This brief link is invalid.</p>")
+
+
+def _share_html_expired() -> str:
+    return _share_wrapper(
+        "Link expired",
+        "<p>This share link has expired. Ask the patient to regenerate it.</p>",
+    )
+
+
+def _share_wrapper(title: str, body: str) -> str:
+    return f"""<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title} — Anteroom</title>
+<style>
+  body{{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;
+       margin:0;padding:24px;background:#F4F7F6;color:#111815}}
+  main{{max-width:640px;margin:24px auto;background:#fff;border-radius:20px;
+       padding:32px;box-shadow:0 1px 3px rgba(17,24,21,0.08)}}
+  h1{{color:#365F50;margin:0 0 8px}}
+  h2{{color:#111815;font-size:16px;margin:20px 0 8px}}
+  .muted{{color:#698075;font-size:12px}}
+  .row{{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #E6EDE9}}
+  .row:last-child{{border-bottom:0}}
+  .label{{color:#698075}}
+  .footer{{margin-top:32px;color:#698075;font-size:11px;text-align:center}}
+  .flag{{background:#FFF3F3;border:1px solid #E6D0D0;color:#9E3838;padding:8px 12px;border-radius:12px;margin:6px 0;font-size:13px}}
+  .empty{{color:#698075;font-style:italic}}
+</style>
+</head><body><main><h1>{title}</h1>{body}
+<div class="footer">Anteroom · Extracted directly from patient documents — no diagnosis.</div>
+</main></body></html>"""
+
+
+def _share_html(doc: dict) -> str:
+    content = doc.get("content") or {}
+    patient = content.get("patient") or {}
+    meds = content.get("medications") or []
+    allergies = content.get("allergies") or []
+    referral = content.get("referral_reason")
+    flagged = content.get("flagged_items") or []
+    generated_at = doc.get("generated_at")
+    gen_str = generated_at.strftime("%Y-%m-%d %H:%M UTC") if generated_at else ""
+
+    def kv(label: str, value: Any) -> str:
+        if value is None or value == "":
+            return ""
+        return f'<div class="row"><span class="label">{_esc(label)}</span><span>{_esc(value)}</span></div>'
+
+    patient_html = "".join(
+        [
+            kv("Name", patient.get("name")),
+            kv("DOB", patient.get("dob")),
+            kv("Sex", patient.get("sex")),
+            kv("ID", patient.get("id_number")),
+        ]
+    ) or '<div class="empty">No patient details detected.</div>'
+
+    meds_html = (
+        "".join(
+            f'<div class="row"><span>{_esc(m.get("name",""))}</span>'
+            f'<span class="muted">{_esc(m.get("dose") or "—")} · {_esc(m.get("frequency") or "—")}</span></div>'
+            for m in meds
+        )
+        or '<div class="empty">None detected.</div>'
+    )
+
+    allergies_html = (
+        "".join(
+            f'<div class="row"><span>{_esc(a.get("substance",""))}</span>'
+            f'<span class="muted">{_esc(a.get("reaction") or "—")}</span></div>'
+            for a in allergies
+        )
+        or '<div class="empty">None detected.</div>'
+    )
+
+    referral_html = (
+        f"<p>{_esc(referral)}</p>"
+        if referral
+        else '<p class="empty">Not detected on the pages.</p>'
+    )
+
+    flagged_html = ""
+    if flagged:
+        flagged_html = "<h2>Flagged for review</h2>" + "".join(
+            f'<div class="flag">{_esc(f)}</div>' for f in flagged
+        )
+
+    return _share_wrapper(
+        "Pre-visit brief",
+        f"""
+<p class="muted">Generated {_esc(gen_str)} · Anteroom · Extracted directly from patient documents — no diagnosis.</p>
+<h2>Patient</h2>{patient_html}
+<h2>Referral reason</h2>{referral_html}
+<h2>Medications ({len(meds)})</h2>{meds_html}
+<h2>Allergies ({len(allergies)})</h2>{allergies_html}
+{flagged_html}
+""",
+    )
 
 
 app.include_router(api_router)

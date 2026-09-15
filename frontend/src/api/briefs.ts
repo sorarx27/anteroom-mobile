@@ -17,8 +17,24 @@ export type Brief = {
   detected_confidence: "low" | "medium" | "high" | null;
   status: "draft" | "complete";
   photos: BriefPhoto[];
+  content: BriefContent | null;
+  generated_at: string | null;
+  share_url_path: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type BriefContent = {
+  patient?: {
+    name?: string | null;
+    dob?: string | null;
+    sex?: string | null;
+    id_number?: string | null;
+  };
+  referral_reason?: string | null;
+  medications?: { name: string; dose?: string | null; frequency?: string | null }[];
+  allergies?: { substance: string; reaction?: string | null }[];
+  flagged_items?: string[];
 };
 
 export const DOC_TYPES: {
@@ -54,4 +70,5 @@ export const briefs = {
     api.del<Brief>(`/briefs/${brief_id}/photos/${photo_id}`),
   detectDocType: (brief_id: string) =>
     api.post<Brief>(`/briefs/${brief_id}/detect-doc-type`),
+  generate: (brief_id: string) => api.post<Brief>(`/briefs/${brief_id}/generate`),
 };

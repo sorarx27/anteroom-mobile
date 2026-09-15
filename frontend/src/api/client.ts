@@ -116,6 +116,23 @@ export function getFileUrl(relativePath: string): {
   };
 }
 
+/**
+ * Absolute URL for the brief PDF endpoint, including token + watermark.
+ * Used for opening in a native viewer / new tab.
+ */
+export function getBriefPdfUrl(brief_id: string, watermark: boolean): string {
+  const params = new URLSearchParams({
+    watermark: watermark ? "true" : "false",
+  });
+  if (inMemoryToken) params.set("token", inMemoryToken);
+  return `${BASE_URL}/api/briefs/${encodeURIComponent(brief_id)}/pdf?${params.toString()}`;
+}
+
+/** Absolute URL for the public share page — safe to render into a QR. */
+export function getPublicUrl(sharePath: string): string {
+  return `${BASE_URL}${sharePath}`;
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path, { method: "GET" }),
   post: <T>(path: string, body?: any) =>

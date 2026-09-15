@@ -41,6 +41,7 @@ export default function BriefDraft() {
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [detecting, setDetecting] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const docType = brief?.doc_type ?? "other";
@@ -108,6 +109,22 @@ export default function BriefDraft() {
       router.replace("/dashboard");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const generateBrief = async () => {
+    if (!brief || photoCount === 0 || generating) return;
+    setGenerating(true);
+    setError(null);
+    try {
+      const updated = await briefs.generate(brief.brief_id);
+      setBrief(updated);
+      queryClient.invalidateQueries({ queryKey: ["briefs"] });
+      router.replace(`/brief-view?brief_id=${updated.brief_id}`);
+    } catch (e: any) {
+      setError(e?.message ?? "Could not generate brief");
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -324,21 +341,57 @@ export default function BriefDraft() {
       <View
         style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}
       >
-        <Pressable
-          testID="brief-draft-save-btn"
-          onPress={saveDraft}
-          disabled={saving || photoCount === 0}
-          style={({ pressed }) => [
-            styles.primaryBtn,
-            (saving || photoCount === 0 || pressed) && styles.primaryBtnDim,
-          ]}
-        >
-          {saving ? (
-            <ActivityIndicator color={colors.onBrandPrimary} />
-          ) : (
-            <Text style={styles.primaryBtnText}>Save draft</Text>
-          )}
-        </Pressable>
+        {brief.content ? (
+          <Pressable
+            testID="brief-draft-view-btn"
+            onPress={() => router.replace(`/brief-view?brief_id=${brief.brief_id}`)}
+            style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.85 }]}
+          >
+            <Ionicons name="document-text-outline" size={18} color={colors.onBrandPrimary} />
+            <Text style={styles.primaryBtnText}>View brief</Text>
+          </Pressable>
+        ) : photoCount > 0 ? (
+          <>
+            <Pressable
+              testID="brief-draft-generate-btn"
+              onPress={generateBrief}
+              disabled={generating}
+              style={({ pressed }) => [
+                styles.primaryBtn,
+                (generating || pressed) && styles.primaryBtnDim,
+              ]}
+            >
+              {generating ? (
+                <>
+                  <ActivityIndicator color={colors.onBrandPrimary} />
+                  <Text style={styles.primaryBtnText}>Reading pages…</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="sparkles" size={18} color={colors.onBrandPrimary} />
+                  <Text style={styles.primaryBtnText}>Generate brief</Text>
+                </>
+              )}
+            </Pressable>
+            <Pressable
+              testID="brief-draft-save-btn"
+              onPress={saveDraft}
+              disabled={saving || generating}
+              style={styles.secondaryBtn}
+            >
+              <Text style={styles.secondaryBtnText}>Save draft for later</Text>
+            </Pressable>
+          </>
+        ) : (
+          <Pressable
+            testID="brief-draft-save-btn"
+            onPress={saveDraft}
+            disabled
+            style={[styles.primaryBtn, styles.primaryBtnDim]}
+          >
+            <Text style={styles.primaryBtnText}>Add a photo to continue</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );
@@ -526,8 +579,16 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: spacing.sm,
     minHeight: 56,
   },
   primaryBtnDim: { opacity: 0.55 },
   primaryBtnText: { color: colors.onBrandPrimary, fontSize: 16, fontWeight: "700" },
+  secondaryBtn: {
+    marginTop: spacing.sm,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  secondaryBtnText: { color: colors.muted, fontSize: 13, fontWeight: "600" },
 });
