@@ -3,7 +3,6 @@ import { Platform } from "react-native";
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
 if (!BASE_URL) {
-  // Fail fast so config issues are obvious in dev.
   console.warn("EXPO_PUBLIC_BACKEND_URL is not set");
 }
 
@@ -35,13 +34,8 @@ async function request<T>(
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string> | undefined),
   };
-  if (inMemoryToken) {
-    headers["Authorization"] = `Bearer ${inMemoryToken}`;
-  }
-  const res = await fetch(`${BASE_URL}/api${path}`, {
-    ...options,
-    headers,
-  });
+  if (inMemoryToken) headers["Authorization"] = `Bearer ${inMemoryToken}`;
+  const res = await fetch(`${BASE_URL}/api${path}`, { ...options, headers });
   const text = await res.text();
   let data: any = null;
   try {
@@ -58,12 +52,78 @@ async function request<T>(
   return data as T;
 }
 
+/**
+ * Upload a local image file to a backend multipart endpoint.
+ * `uri` is what expo-image-picker returns (native: file://... , web: blob://...).
+ */
+export async function apiUpload<T>(
+  path: string,
+  file: { uri: string; name: string; type: string },
+): Promise<T> {
+  const form = new FormData();
+  if (Platform.OS === "web") {
+    // On web, the blob: URI must be fetched and appended as a real Blob.
+    const blob = await (await fetch(file.uri)).blob();
+    form.append("file", blob, file.name);
+  } else {
+    // Native shape.
+    form.append("file", { uri: file.uri, name: file.name, type: file.type } as any);
+  }
+  const headers: Record<string, string> = {};
+  if (inMemoryToken) headers["Authorization"] = `Bearer ${inMemoryToken}`;
+  // NEVER set Content-Type here — the runtime adds the multipart boundary.
+  const res = await fetch(`${BASE_URL}/api${path}`, {
+    method: "POST",
+    headers,
+    body: form as any,
+  });
+  const text = await res.text();
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+  if (!res.ok) {
+    const message =
+      (data && (data.detail || data.message)) ||
+      `Upload failed (${res.status})`;
+    throw new ApiError(res.status, String(message), data);
+  }
+  return data as T;
+}
+
+/**
+ * Build an image URL the current session can render.
+ * Native <Image source={{ uri, headers }} /> can send Authorization.
+ * Web <img> cannot — so we tack the session token onto the query string
+ * and the backend accepts it there too.
+ */
+export function getFileUrl(relativePath: string): {
+  uri: string;
+  headers?: Record<string, string>;
+} {
+  const absolute = `${BASE_URL}${relativePath}`;
+  if (Platform.OS === "web") {
+    const sep = absolute.includes("?") ? "&" : "?";
+    return {
+      uri: inMemoryToken ? `${absolute}${sep}token=${encodeURIComponent(inMemoryToken)}` : absolute,
+    };
+  }
+  return {
+    uri: absolute,
+    headers: inMemoryToken ? { Authorization: `Bearer ${inMemoryToken}` } : undefined,
+  };
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path, { method: "GET" }),
   post: <T>(path: string, body?: any) =>
     request<T>(path, { method: "POST", body: JSON.stringify(body ?? {}) }),
   put: <T>(path: string, body?: any) =>
     request<T>(path, { method: "PUT", body: JSON.stringify(body ?? {}) }),
+  patch: <T>(path: string, body?: any) =>
+    request<T>(path, { method: "PATCH", body: JSON.stringify(body ?? {}) }),
   del: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 

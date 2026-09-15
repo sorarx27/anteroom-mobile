@@ -1,0 +1,37 @@
+{
+  "summary": "Backend (8/8) and frontend (auth → dashboard → capture → brief thumbnail rendering) tests for Anteroom brief capture flow passed. All /api/briefs endpoints (create, list, get, patch doc_type/status/photo_order, delete, photo upload, photo file serve via Bearer + ?token=, photo soft-delete, brief soft-delete) work correctly; cross-user isolation returns 404 as expected; invalid doc_type returns 400; non-image content-type returns 400. Frontend verified via Playwright: sign-in (after toggling from default 'Create account' to 'Sign in' link), dashboard loads with pre-seeded brief card and thumbnail image loaded successfully (naturalWidth>0, URL contains ?token=), Create-a-brief button navigates to capture-screen, all 4 capture testIDs (camera/gallery/next/cancel) present, capture-next-btn text = 'Add a photo to continue' with aria-disabled=true and opacity 0.55 when zero photos attached. Brief-draft doc-type chip persistence and photo deletion via UI are exercised at the API layer (PATCH & DELETE endpoints pass); a Playwright wait failed at end due to two dashboard-screen elements briefly co-existing during Expo-Router transition — this is a test-selector nuisance, not a product bug.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/auth", "issues": ["Screen defaults to 'Create your account' mode. Users returning to log in must tap the small 'Sign in' link at the bottom. Consider making the initial mode based on whether the user has previously registered, or making the toggle more prominent."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_briefs.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) In app/_layout.tsx AuthGate, avoid keeping capture-screen mounted (data-testid duplicated) when replacing to /dashboard — under strict-mode Playwright waits, two elements match briefly during transitions.",
+    "(Optional UX) Default /auth to 'Sign in' mode or make the Sign in/Create toggle more prominent — users returning after logout land on the Create form and see 'Email already registered' error if they type their existing email."
+  ],
+  "critical_code_review_comments": [
+    "server.py:576 sets media_type from storage-reported Content-Type but never falls back if storage returned octet-stream — currently harmless because put_object stores the correct content_type from upload, and photos always have an allowed image type.",
+    "client.ts:38 uses process.env.EXPO_PUBLIC_BACKEND_URL correctly. The review request spec mentioned EXPO_BACKEND_URL, but the actual (and correct) key in frontend/.env is EXPO_PUBLIC_BACKEND_URL — this is standard for Expo public runtime env. No action needed.",
+    "capture.tsx unused import: 'Platform' is imported but not used (line 8). Minor cleanup only."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_briefs.py (new)"
+  ],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "~90% (auth+dashboard+capture verified end-to-end; brief-draft chip/delete/discard verified via API; not driven via Playwright due to Expo-Router transition duplicate-selector race)"},
+  "seed_data_creation": "Registered ephemeral qa_{ts}_b@anteroom.dev for cross-user isolation test. Created several draft briefs and 1x1 PNG photos under test1@anteroom.dev — these accumulate on the dev instance (14 briefs visible in dashboard). Consider adding an admin cleanup or per-test teardown if the seed clutter becomes an issue.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Auth screen defaults to signup mode; when testing sign-in via UI, click text 'Sign in' before filling credentials. Use EXPO_PUBLIC_BACKEND_URL (not EXPO_BACKEND_URL) from frontend/.env for base URL. Backend photo endpoints accept multipart 'file' field only. Photo GET supports both Authorization: Bearer and ?token= query for web <img>. When navigating between Expo-Router screens with router.replace, briefly two testIDs may coexist — prefer .first or explicit URL waits over strict-mode wait_for_selector.",
+  "rca_of_issue": "N/A — no functional bugs found in this iteration. The single Playwright timeout at the end of the frontend script was caused by strict-mode selector resolving to two dashboard-screen elements during the /capture → /dashboard router.replace transition, not a product defect."
+}

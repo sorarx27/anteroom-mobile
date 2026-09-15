@@ -9,14 +9,23 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.medicalbriefsetup.uhg3cv"
+      "bundleIdentifier": "com.emergent.medicalbriefsetup.uhg3cv",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Snap medical documents for your briefs",
+        "NSPhotoLibraryUsageDescription": "Attach photos of medical documents to briefs",
+        "NSPhotoLibraryAddUsageDescription": "Save exported briefs to your photos"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.emergent.medicalbriefsetup.uhg3cv"
+      "package": "com.emergent.medicalbriefsetup.uhg3cv",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES"
+      ]
     },
     "web": {
       "bundler": "metro",

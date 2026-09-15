@@ -1,14 +1,20 @@
+import { useCallback } from "react";
 import {
+  FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
+import Ionicons from "@react-native-vector-icons/ionicons";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { Brief, briefs, DOC_TYPES } from "@/src/api/briefs";
+import { getFileUrl } from "@/src/api/client";
 import { useAuth } from "@/src/auth/AuthContext";
 import { useSubscription } from "@/src/lib/revenuecat";
 import { colors, radius, spacing } from "@/src/theme";
@@ -16,23 +22,45 @@ import { colors, radius, spacing } from "@/src/theme";
 const CLIPBOARD_IMG =
   "https://images.unsplash.com/photo-1651760680066-db9d32bd0357?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHwxfHxlbXB0eSUyMG1lZGljYWwlMjBjbGlwYm9hcmQlMjBjbGVhbnxlbnwwfHx8fDE3ODk0ODU2MDR8MA&ixlib=rb-4.1.0&q=85";
 
-type LockedFeature = {
-  key: string;
-  icon: string;
-  label: string;
-};
-
-const LOCKED_FEATURES: LockedFeature[] = [
+const LOCKED_FEATURES = [
   { key: "clean-export", icon: "document-text-outline", label: "Clean export" },
   { key: "family-profiles", icon: "people-outline", label: "Family profiles" },
   { key: "translate", icon: "language-outline", label: "Translate" },
 ];
 
+function docTypeLabel(dt: Brief["doc_type"]): { label: string; icon: string } {
+  return DOC_TYPES.find((d) => d.key === dt) ?? DOC_TYPES[3];
+}
+
+function relativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const s = Math.max(1, Math.floor(diffMs / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
 export default function Dashboard() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, signOut } = useAuth();
   const { isSubscribed } = useSubscription();
+
+  const listQuery = useQuery({
+    queryKey: ["briefs"],
+    queryFn: () => briefs.list(),
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ["briefs"] });
+    }, [queryClient]),
+  );
 
   const initials = (user?.name ?? user?.email ?? "A")
     .split(" ")
@@ -42,16 +70,106 @@ export default function Dashboard() {
     .join("")
     .toUpperCase();
 
-  const openPaywall = (trigger: string) =>
-    router.push(`/paywall?trigger=${trigger}`);
+  const items = listQuery.data ?? [];
+  const openPaywall = (trigger: string) => router.push(`/paywall?trigger=${trigger}`);
+  const createBrief = () => router.push("/capture");
+
+  const openBrief = (b: Brief) => {
+    router.push(`/brief-draft?brief_id=${b.brief_id}`);
+  };
+
+  const renderHeader = () => (
+    <>
+      <View style={styles.hero}>
+        <View style={styles.imageWrap}>
+          {items.length === 0 ? (
+            <Image
+              source={{ uri: CLIPBOARD_IMG }}
+              style={styles.image}
+              contentFit="cover"
+              transition={200}
+            />
+          ) : (
+            <Ionicons name="folder-open-outline" size={44} color={colors.brandPrimary} />
+          )}
+        </View>
+        <Text style={styles.heroTitle} testID="dashboard-empty-title">
+          {items.length === 0 ? "No briefs yet" : `${items.length} brief${items.length === 1 ? "" : "s"}`}
+        </Text>
+        <Text style={styles.heroText}>
+          {items.length === 0
+            ? "Snap your first referral or lab result to generate a doctor-ready 1-page summary."
+            : "Keep drafting, or start a new brief for your next visit."}
+        </Text>
+
+        {!isSubscribed ? (
+          <View style={styles.lockedRow} testID="dashboard-locked-features">
+            {LOCKED_FEATURES.map((f) => (
+              <Pressable
+                key={f.key}
+                testID={`dashboard-locked-${f.key}`}
+                onPress={() => openPaywall(f.key)}
+                style={styles.lockedChip}
+              >
+                <Ionicons name={f.icon as any} size={14} color={colors.onSurfaceSecondary} />
+                <Text style={styles.lockedChipText}>{f.label}</Text>
+                <Ionicons name="lock-closed" size={11} color={colors.muted} />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+      </View>
+
+      {items.length > 0 ? (
+        <Text style={styles.listLabel}>Your briefs</Text>
+      ) : null}
+    </>
+  );
+
+  const renderItem = ({ item }: { item: Brief }) => {
+    const dt = docTypeLabel(item.doc_type);
+    const cover = item.photos[0];
+    return (
+      <Pressable
+        testID={`brief-card-${item.brief_id}`}
+        onPress={() => openBrief(item)}
+        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      >
+        <View style={styles.cardThumb}>
+          {cover ? (
+            <Image
+              source={getFileUrl(cover.url) as any}
+              style={StyleSheet.absoluteFillObject}
+              contentFit="cover"
+              transition={150}
+            />
+          ) : (
+            <Ionicons name="images-outline" size={22} color={colors.muted} />
+          )}
+        </View>
+        <View style={styles.cardBody}>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name={dt.icon as any} size={14} color={colors.brandPrimary} />
+            <Text style={styles.cardTitle}>{dt.label}</Text>
+            {item.status === "draft" ? (
+              <View style={styles.draftPill}>
+                <Text style={styles.draftPillText}>DRAFT</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.cardMeta} numberOfLines={1}>
+            {item.photos.length} photo{item.photos.length === 1 ? "" : "s"} • {relativeTime(item.updated_at)}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+      </Pressable>
+    );
+  };
 
   return (
     <View style={styles.container} testID="dashboard-screen">
       <View
-        style={[
-          styles.header,
-          { paddingTop: insets.top + spacing.md },
-        ]}
+        style={[styles.header, { paddingTop: insets.top + spacing.md }]}
       >
         <View style={styles.headerLeft}>
           <Text style={styles.brand} testID="dashboard-brand">Anteroom</Text>
@@ -86,39 +204,24 @@ export default function Dashboard() {
         </View>
       </View>
 
-      <View style={styles.body}>
-        <View style={styles.imageWrap}>
-          <Image
-            source={{ uri: CLIPBOARD_IMG }}
-            style={styles.image}
-            contentFit="cover"
-            transition={200}
+      <FlatList
+        data={items}
+        keyExtractor={(b) => b.brief_id}
+        renderItem={renderItem}
+        ListHeaderComponent={renderHeader}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: insets.bottom + 120 },
+        ]}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={listQuery.isFetching}
+            onRefresh={() => listQuery.refetch()}
+            tintColor={colors.brandPrimary}
           />
-        </View>
-        <Text style={styles.emptyTitle} testID="dashboard-empty-title">
-          No briefs yet
-        </Text>
-        <Text style={styles.emptyText}>
-          Snap your first referral or lab result to generate a doctor-ready 1-page summary.
-        </Text>
-
-        {!isSubscribed ? (
-          <View style={styles.lockedRow} testID="dashboard-locked-features">
-            {LOCKED_FEATURES.map((f) => (
-              <Pressable
-                key={f.key}
-                testID={`dashboard-locked-${f.key}`}
-                onPress={() => openPaywall(f.key)}
-                style={styles.lockedChip}
-              >
-                <Ionicons name={f.icon as any} size={14} color={colors.onSurfaceSecondary} />
-                <Text style={styles.lockedChipText}>{f.label}</Text>
-                <Ionicons name="lock-closed" size={11} color={colors.muted} />
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-      </View>
+        }
+      />
 
       <View
         style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}
@@ -126,9 +229,7 @@ export default function Dashboard() {
         <Pressable
           testID="dashboard-create-btn"
           style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
-          onPress={() => {
-            // future feature
-          }}
+          onPress={createBrief}
         >
           <Ionicons name="camera-outline" size={20} color={colors.onBrandPrimary} />
           <Text style={styles.primaryBtnText}>Create a brief</Text>
@@ -203,35 +304,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
   },
-  body: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+  listContent: {
     paddingHorizontal: spacing.xl,
-    gap: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  hero: {
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: spacing.xl,
   },
   imageWrap: {
-    width: 200,
-    height: 200,
+    width: 140,
+    height: 140,
     borderRadius: radius.lg,
     backgroundColor: colors.brandTertiary,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   image: { width: "100%", height: "100%" },
-  emptyTitle: {
+  heroTitle: {
     color: colors.onSurface,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "700",
     letterSpacing: -0.3,
   },
-  emptyText: {
+  heroText: {
     color: colors.muted,
-    fontSize: 15,
+    fontSize: 14,
     textAlign: "center",
-    lineHeight: 22,
+    lineHeight: 20,
     maxWidth: 300,
   },
   lockedRow: {
@@ -257,9 +360,62 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
   },
+  listLabel: {
+    color: colors.onSurfaceTertiary,
+    fontSize: 12,
+    letterSpacing: 1.5,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    marginBottom: spacing.md,
+    marginTop: spacing.sm,
+  },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cardPressed: { opacity: 0.75 },
+  cardThumb: {
+    width: 56,
+    height: 72,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceSecondary,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardBody: { flex: 1, gap: 4 },
+  cardTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  cardTitle: { color: colors.onSurface, fontSize: 15, fontWeight: "700" },
+  cardMeta: { color: colors.muted, fontSize: 12 },
+  draftPill: {
+    marginLeft: spacing.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.warning,
+  },
+  draftPillText: {
+    color: colors.onWarning,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+  },
   footer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
+    backgroundColor: "rgba(255,255,255,0.96)",
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   primaryBtn: {
     backgroundColor: colors.brandPrimary,
