@@ -116,7 +116,7 @@ fun AnteroomApp(
                         authService = authService
                     )
                 } else if (currentUser != null) {
-                    MainHomeScreen(
+                    DashboardScreen(
                         user = currentUser,
                         authService = authService
                     )
