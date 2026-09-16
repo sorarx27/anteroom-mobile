@@ -12,6 +12,9 @@ interface BriefsRepository {
     suspend fun addPhotoToBrief(briefId: String, photo: BriefPhoto): Brief?
     suspend fun removePhotoFromBrief(briefId: String, photoId: String): Brief?
     suspend fun deleteBrief(briefId: String)
+    suspend fun detectDocType(briefId: String): DocType
+    suspend fun generateBrief(briefId: String, outputLanguage: BriefLanguage): Brief
+    suspend fun translateBrief(briefId: String, targetLanguage: BriefLanguage): Brief
 }
 
 class BriefsRepositoryImpl : BriefsRepository {
@@ -117,5 +120,98 @@ class BriefsRepositoryImpl : BriefsRepository {
             FirebaseService.firestore.collection("briefs").document(briefId).delete()
         } catch (_: Exception) {
         }
+    }
+
+    override suspend fun detectDocType(briefId: String): DocType {
+        kotlinx.coroutines.delay(1200)
+        val existing = memoryBriefs.value.find { it.brief_id == briefId }
+        val detected = when {
+            existing?.photos?.size ?: 0 > 2 -> DocType.referral
+            existing?.photos?.size == 2 -> DocType.lab_result
+            else -> DocType.med_list
+        }
+        if (existing != null) {
+            val updated = existing.copy(
+                detected_doc_type = detected,
+                detected_confidence = BriefConfidence.high,
+                doc_type = if (existing.doc_type_manual_override) existing.doc_type else detected
+            )
+            memoryBriefs.value = memoryBriefs.value.map {
+                if (it.brief_id == briefId) updated else it
+            }
+        }
+        return detected
+    }
+
+    override suspend fun generateBrief(briefId: String, outputLanguage: BriefLanguage): Brief {
+        kotlinx.coroutines.delay(2000)
+        val existing = memoryBriefs.value.find { it.brief_id == briefId }
+        val sampleBrief = MockData.sampleBriefs.first()
+
+        val generated = (existing ?: sampleBrief).copy(
+            status = BriefStatus.complete,
+            content = sampleBrief.content,
+            share_url_path = "/s/$briefId",
+            updated_at = "2026-09-16T15:30:00Z"
+        )
+
+        memoryBriefs.value = memoryBriefs.value.map {
+            if (it.brief_id == briefId) generated else it
+        }
+
+        try {
+            FirebaseService.firestore.collection("briefs").document(briefId).update(
+                mapOf(
+                    "status" to "complete",
+                    "updated_at" to "2026-09-16T15:30:00Z"
+                )
+            )
+        } catch (_: Exception) {
+        }
+
+        return generated
+    }
+
+    override suspend fun translateBrief(briefId: String, targetLanguage: BriefLanguage): Brief {
+        kotlinx.coroutines.delay(1500)
+        val existing = memoryBriefs.value.find { it.brief_id == briefId }
+            ?: throw IllegalStateException("Brief not found")
+
+        val currentContent = existing.content
+        val translatedContent = if (currentContent != null) {
+            when (targetLanguage) {
+                BriefLanguage.es -> BriefContent(
+                    patient = currentContent.patient,
+                    referral_reason = "Consulta de cardiología para evaluación de palpitaciones intermitentes e hipertensión limítrofe observada en clínica general.",
+                    medications = currentContent.medications,
+                    allergies = currentContent.allergies.map {
+                        it.copy(reaction = if (it.reaction?.contains("hives", ignoreCase = true) == true) "Urticaria" else it.reaction)
+                    },
+                    flagged_items = listOf(
+                        "Dosis de Lisinopril documentada como 20mg una vez al día, pero el frasco del paciente muestra 10mg.",
+                        "Alergia a la penicilina notada en el historial clínico."
+                    )
+                )
+                BriefLanguage.en -> currentContent
+            }
+        } else null
+
+        val currentTranslations = existing.content_translations ?: emptyMap()
+        val updatedTranslations = if (translatedContent != null) {
+            currentTranslations + (targetLanguage.key to translatedContent)
+        } else {
+            currentTranslations
+        }
+
+        val updated = existing.copy(
+            content_translations = updatedTranslations,
+            available_languages = (existing.available_languages + targetLanguage).distinct()
+        )
+
+        memoryBriefs.value = memoryBriefs.value.map {
+            if (it.brief_id == briefId) updated else it
+        }
+
+        return updated
     }
 }

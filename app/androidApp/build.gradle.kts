@@ -18,6 +18,8 @@ dependencies {
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
+
+    implementation("com.revenuecat.purchases:purchases:8.12.2")
 }
 
 android {

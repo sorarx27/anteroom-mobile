@@ -15,37 +15,42 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.zayedmd.anteroom.subscription.RevenueCatService
+import com.zayedmd.anteroom.subscription.RevenueCatServiceImpl
+import com.zayedmd.anteroom.subscription.SubscriptionPackage
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
-
-data class PaywallPackage(
-    val id: String,
-    val title: String,
-    val price: String,
-    val cadence: String,
-    val badge: String? = null
-)
+import kotlinx.coroutines.launch
 
 @Composable
 fun PaywallModal(
     onDismiss: () -> Unit,
     onUpgradeSuccess: () -> Unit,
-    triggerReason: String = "family-profiles"
+    triggerReason: String = "family-profiles",
+    revenueCatService: RevenueCatService = remember { RevenueCatServiceImpl() }
 ) {
-    val packages = listOf(
-        PaywallPackage("\$rc_annual", "Annual", "$49.99", "per year", badge = "Best value"),
-        PaywallPackage("\$rc_monthly", "Monthly", "$7.99", "per month"),
-        PaywallPackage("\$rc_lifetime", "Lifetime", "$129.99", "one time")
-    )
+    val scope = rememberCoroutineScope()
+    val offering by revenueCatService.activeOffering.collectAsState()
+    val isProcessing by revenueCatService.isProcessing.collectAsState()
+    val lastError by revenueCatService.lastError.collectAsState()
 
-    var selectedPkgId by remember { mutableStateOf("\$rc_annual") }
-    var isUpgrading by remember { mutableStateOf(false) }
+    val packages = remember(offering) {
+        offering?.availablePackages ?: listOf(
+            RevenueCatServiceImpl.SANDBOX_MONTHLY,
+            RevenueCatServiceImpl.SANDBOX_LIFETIME
+        )
+    }
+
+    var selectedPkgId by remember(packages) {
+        mutableStateOf(packages.firstOrNull()?.identifier ?: RevenueCatServiceImpl.PACKAGE_MONTHLY)
+    }
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isProcessing) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
@@ -73,7 +78,7 @@ fun PaywallModal(
                             .size(38.dp)
                             .clip(CircleShape)
                             .background(AnteroomColors.SurfaceSecondary)
-                            .clickable { onDismiss() },
+                            .clickable(enabled = !isProcessing) { onDismiss() },
                         contentAlignment = Alignment.Center
                     ) {
                         Text("✕", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AnteroomColors.OnSurface)
@@ -99,10 +104,11 @@ fun PaywallModal(
                 ) {
                     // Title & pitch
                     Text(
-                        text = if (triggerReason == "family-profiles") {
-                            "Add family profiles with Pro"
-                        } else {
-                            "Unlock the full power of Anteroom"
+                        text = when (triggerReason) {
+                            "family-profiles" -> "Add family profiles with Pro"
+                            "clean-export" -> "Clean doctor export with Pro"
+                            "translate" -> "Instant translation with Pro"
+                            else -> "Unlock the full power of Anteroom"
                         },
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
@@ -111,7 +117,7 @@ fun PaywallModal(
                     )
 
                     Text(
-                        text = "Manage health paperwork for your kids, partner, or parents under one unified account.",
+                        text = "Manage health paperwork for your kids, partner, or parents with watermark-free doctor summaries and instant translation.",
                         fontSize = 14.sp,
                         color = AnteroomColors.OnSurfaceSecondary,
                         lineHeight = 20.sp
@@ -135,7 +141,7 @@ fun PaywallModal(
                         ProFeatureRow(
                             icon = "📄",
                             title = "Clean doctor export",
-                            desc = "Download watermarked-free PDFs and generate clinic QR codes."
+                            desc = "Download watermark-free PDFs and generate clinic QR codes."
                         )
                         HorizontalDivider(color = AnteroomColors.Border)
                         ProFeatureRow(
@@ -145,7 +151,7 @@ fun PaywallModal(
                         )
                     }
 
-                    // Package selection
+                    // Package selection (Monthly & Lifetime only)
                     Text(
                         text = "CHOOSE A PLAN",
                         fontSize = 11.sp,
@@ -155,7 +161,7 @@ fun PaywallModal(
                     )
 
                     packages.forEach { pkg ->
-                        val isSelected = selectedPkgId == pkg.id
+                        val isSelected = selectedPkgId == pkg.identifier
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -166,7 +172,7 @@ fun PaywallModal(
                                     color = if (isSelected) AnteroomColors.BrandPrimary else AnteroomColors.Border,
                                     shape = RoundedCornerShape(14.dp)
                                 )
-                                .clickable { selectedPkgId = pkg.id }
+                                .clickable(enabled = !isProcessing) { selectedPkgId = pkg.identifier }
                                 .padding(16.dp)
                         ) {
                             Row(
@@ -180,12 +186,12 @@ fun PaywallModal(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         Text(
-                                            text = pkg.title,
+                                            text = if (pkg.isLifetime) "Lifetime access" else "Monthly plan",
                                             fontSize = 16.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = AnteroomColors.OnSurface
                                         )
-                                        if (pkg.badge != null) {
+                                        if (pkg.isLifetime) {
                                             Box(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(999.dp))
@@ -193,7 +199,7 @@ fun PaywallModal(
                                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                                             ) {
                                                 Text(
-                                                    text = pkg.badge,
+                                                    text = "Pay once, keep forever",
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = Color.White
@@ -202,14 +208,14 @@ fun PaywallModal(
                                         }
                                     }
                                     Text(
-                                        text = pkg.cadence,
+                                        text = if (pkg.isLifetime) "One-time payment" else "Renews monthly, cancel anytime",
                                         fontSize = 12.sp,
                                         color = AnteroomColors.Muted
                                     )
                                 }
 
                                 Text(
-                                    text = pkg.price,
+                                    text = pkg.priceString,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = AnteroomColors.BrandPrimary
@@ -218,10 +224,21 @@ fun PaywallModal(
                         }
                     }
 
+                    // Error message banner
+                    if (!lastError.isNullOrBlank()) {
+                        Text(
+                            text = lastError!!,
+                            fontSize = 13.sp,
+                            color = Color(0xFFC62828),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(10.dp))
                 }
 
-                // CTA Button
+                // CTA Button & Restore Purchases
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = Color.White,
@@ -230,15 +247,23 @@ fun PaywallModal(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 14.dp)
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        val selectedPackage = packages.find { it.identifier == selectedPkgId } ?: packages.firstOrNull()
+
                         Button(
                             onClick = {
-                                if (!isUpgrading) {
-                                    isUpgrading = true
-                                    onUpgradeSuccess()
+                                if (selectedPackage != null && !isProcessing) {
+                                    scope.launch {
+                                        val result = revenueCatService.purchasePackage(selectedPackage)
+                                        if (result.isSuccess) {
+                                            onUpgradeSuccess()
+                                        }
+                                    }
                                 }
                             },
+                            enabled = !isProcessing,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp),
@@ -248,7 +273,7 @@ fun PaywallModal(
                                 contentColor = Color.White
                             )
                         ) {
-                            if (isUpgrading) {
+                            if (isProcessing) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(20.dp),
                                     color = Color.White,
@@ -256,11 +281,34 @@ fun PaywallModal(
                                 )
                             } else {
                                 Text(
-                                    text = "Continue with ${packages.firstOrNull { it.id == selectedPkgId }?.title ?: "Plan"}",
+                                    text = "Continue with ${selectedPackage?.priceString ?: "$7.99/mo"}",
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        TextButton(
+                            onClick = {
+                                if (!isProcessing) {
+                                    scope.launch {
+                                        val result = revenueCatService.restorePurchases()
+                                        if (result.isSuccess) {
+                                            onUpgradeSuccess()
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = !isProcessing
+                        ) {
+                            Text(
+                                text = "Restore purchases",
+                                fontSize = 12.sp,
+                                color = AnteroomColors.Muted,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
                     }
                 }

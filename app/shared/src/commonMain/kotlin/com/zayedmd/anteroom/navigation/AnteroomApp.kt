@@ -26,6 +26,8 @@ import com.zayedmd.anteroom.data.ProfilesRepositoryImpl
 import com.zayedmd.anteroom.media.CapturedPhoto
 import com.zayedmd.anteroom.model.Brief
 import com.zayedmd.anteroom.model.Profile
+import com.zayedmd.anteroom.subscription.RevenueCatService
+import com.zayedmd.anteroom.subscription.RevenueCatServiceImpl
 import com.zayedmd.anteroom.subscription.SubscriptionService
 import com.zayedmd.anteroom.ui.components.PaywallModal
 import com.zayedmd.anteroom.ui.screens.*
@@ -43,13 +45,16 @@ sealed interface AppScreen {
     object Dashboard : AppScreen
     data class ProfileAddEdit(val profile: Profile? = null) : AppScreen
     data class Capture(val profile: Profile?, val existingBriefId: String? = null) : AppScreen
+    data class BriefDraft(val briefId: String) : AppScreen
+    data class BriefView(val briefId: String) : AppScreen
 }
 
 @Composable
 fun AnteroomApp(
     authService: AuthService = remember { AuthServiceImpl() },
     profilesRepository: ProfilesRepository = remember { ProfilesRepositoryImpl() },
-    briefsRepository: BriefsRepository = remember { BriefsRepositoryImpl() }
+    briefsRepository: BriefsRepository = remember { BriefsRepositoryImpl() },
+    revenueCatService: RevenueCatService = remember { RevenueCatServiceImpl() }
 ) {
     val status by authService.status.collectAsState()
     val user by authService.user.collectAsState()
@@ -186,7 +191,9 @@ fun AnteroomApp(
                                 onBriefClick = { brief ->
                                     if (brief.status == com.zayedmd.anteroom.model.BriefStatus.draft) {
                                         activeBriefId = brief.brief_id
-                                        currentScreen = AppScreen.Capture(null, brief.brief_id)
+                                        currentScreen = AppScreen.BriefDraft(brief.brief_id)
+                                    } else {
+                                        currentScreen = AppScreen.BriefView(brief.brief_id)
                                     }
                                 }
                             )
@@ -213,8 +220,63 @@ fun AnteroomApp(
                                     currentScreen = AppScreen.Dashboard
                                 },
                                 onReviewClick = {
-                                    // Proceeds to Brief Draft Review screen
+                                    val targetBriefId = screen.existingBriefId ?: activeBriefId
+                                    if (targetBriefId != null) {
+                                        currentScreen = AppScreen.BriefDraft(targetBriefId)
+                                    } else {
+                                        currentScreen = AppScreen.Dashboard
+                                    }
+                                }
+                            )
+                        }
+
+                        is AppScreen.BriefDraft -> {
+                            BriefDraftScreen(
+                                briefId = screen.briefId,
+                                briefsRepository = briefsRepository,
+                                isSubscribed = isSubscribed,
+                                onBack = {
                                     currentScreen = AppScreen.Dashboard
+                                },
+                                onAddMorePhotos = {
+                                    currentScreen = AppScreen.Capture(null, screen.briefId)
+                                },
+                                onBriefGenerated = { completedBrief ->
+                                    currentScreen = AppScreen.BriefView(completedBrief.brief_id)
+                                },
+                                onDiscardDraft = {
+                                    currentScreen = AppScreen.Dashboard
+                                },
+                                onUpgradeRequired = {
+                                    paywallTrigger = "translate"
+                                    showPaywallModal = true
+                                }
+                            )
+                        }
+
+                        is AppScreen.BriefView -> {
+                            BriefViewScreen(
+                                briefId = screen.briefId,
+                                briefsRepository = briefsRepository,
+                                isSubscribed = isSubscribed,
+                                onBack = {
+                                    currentScreen = AppScreen.Dashboard
+                                },
+                                onEditDraft = {
+                                    currentScreen = AppScreen.BriefDraft(screen.briefId)
+                                },
+                                onUpgradeRequired = {
+                                    paywallTrigger = "brief-view"
+                                    showPaywallModal = true
+                                },
+                                onOpenShareLink = { fullUrl ->
+                                    // Fallback/log URL or open in browser
+                                },
+                                onDownloadPdf = {
+                                    if (!isSubscribed) {
+                                        paywallTrigger = "clean-export"
+                                        showPaywallModal = true
+                                    }
                                 }
                             )
                         }
@@ -265,6 +327,7 @@ fun AnteroomApp(
                     if (showPaywallModal) {
                         PaywallModal(
                             triggerReason = paywallTrigger,
+                            revenueCatService = revenueCatService,
                             onDismiss = { showPaywallModal = false },
                             onUpgradeSuccess = {
                                 SubscriptionService.setSubscribed(true)
