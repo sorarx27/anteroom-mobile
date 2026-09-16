@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "458778941992",
+    "project_id": "anteroom-d2e72",
+    "storage_bucket": "anteroom-d2e72.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:458778941992:android:faaac5e62b08afddaf331d",
+        "android_client_info": {
+          "package_name": "com.zayedmd.anteroom"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "458778941992-4d35qtsish5ovvigu3a4t5kntasu81k0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.zayedmd.anteroom",
+            "certificate_hash": "f4bd9e5b6af9c03b1a7884c348a9d9f588e62b74"
+          }
+        },
+        {
+          "client_id": "458778941992-fukpdv8hp4lp93p1peapjibjoqunpsvo.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhNhp_3oaFJXXHi7HEGE97cfVbxf6TYgw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "458778941992-fukpdv8hp4lp93p1peapjibjoqunpsvo.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "458778941992-p2i94cljkk281ta6okhmm41mklto3d95.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.zayedmd.anteroom"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "458778941992",
+    "project_id": "anteroom-d2e72",
+    "storage_bucket": "anteroom-d2e72.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:458778941992:android:faaac5e62b08afddaf331d",
+        "android_client_info": {
+          "package_name": "com.zayedmd.anteroom"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhNhp_3oaFJXXHi7HEGE97cfVbxf6TYgw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
