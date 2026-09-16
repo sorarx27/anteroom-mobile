@@ -40,6 +40,7 @@ fun DashboardScreen(
     isSubscribed: Boolean = false,
     onUpgradeClick: () -> Unit = {},
     onAddProfileClick: () -> Unit = {},
+    onEditProfileClick: (Profile) -> Unit = {},
     onSnapClick: () -> Unit = {},
     onBriefClick: (Brief) -> Unit = {}
 ) {
@@ -99,7 +100,8 @@ fun DashboardScreen(
                             activeProfileId = selected.profile_id
                         }
                     },
-                    onAddProfileClick = onAddProfileClick
+                    onAddProfileClick = onAddProfileClick,
+                    onEditProfileClick = onEditProfileClick
                 )
 
                 HorizontalDivider(color = AnteroomColors.Border, thickness = 0.5.dp)

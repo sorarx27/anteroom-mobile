@@ -18,9 +18,20 @@ import androidx.compose.ui.unit.sp
 import com.zayedmd.anteroom.auth.AuthService
 import com.zayedmd.anteroom.auth.AuthServiceImpl
 import com.zayedmd.anteroom.auth.AuthStatus
+import com.zayedmd.anteroom.data.BriefsRepository
+import com.zayedmd.anteroom.data.BriefsRepositoryImpl
+import com.zayedmd.anteroom.data.PhotoUploadService
+import com.zayedmd.anteroom.data.ProfilesRepository
+import com.zayedmd.anteroom.data.ProfilesRepositoryImpl
+import com.zayedmd.anteroom.media.CapturedPhoto
+import com.zayedmd.anteroom.model.Brief
+import com.zayedmd.anteroom.model.Profile
+import com.zayedmd.anteroom.subscription.SubscriptionService
+import com.zayedmd.anteroom.ui.components.PaywallModal
 import com.zayedmd.anteroom.ui.screens.*
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
 import com.zayedmd.anteroom.ui.theme.AnteroomTheme
+import kotlinx.coroutines.launch
 
 sealed interface OnboardingDestination {
     object Welcome : OnboardingDestination
@@ -28,14 +39,34 @@ sealed interface OnboardingDestination {
     data class Auth(val mode: AuthMode) : OnboardingDestination
 }
 
+sealed interface AppScreen {
+    object Dashboard : AppScreen
+    data class ProfileAddEdit(val profile: Profile? = null) : AppScreen
+    data class Capture(val profile: Profile?, val existingBriefId: String? = null) : AppScreen
+}
+
 @Composable
 fun AnteroomApp(
-    authService: AuthService = remember { AuthServiceImpl() }
+    authService: AuthService = remember { AuthServiceImpl() },
+    profilesRepository: ProfilesRepository = remember { ProfilesRepositoryImpl() },
+    briefsRepository: BriefsRepository = remember { BriefsRepositoryImpl() }
 ) {
     val status by authService.status.collectAsState()
     val user by authService.user.collectAsState()
+    val isSubscribed by SubscriptionService.isSubscribed.collectAsState()
 
     var onboardingDestination by remember { mutableStateOf<OnboardingDestination>(OnboardingDestination.Welcome) }
+    var currentScreen by remember { mutableStateOf<AppScreen>(AppScreen.Dashboard) }
+    var showPaywallModal by remember { mutableStateOf(false) }
+    var paywallTrigger by remember { mutableStateOf("family-profiles") }
+
+    val photoUploadService = remember { PhotoUploadService(briefsRepository) }
+    val uploadingCount by photoUploadService.uploadingCount.collectAsState()
+    val uploadError by photoUploadService.lastError.collectAsState()
+    var activeDraftPhotos by remember { mutableStateOf<List<CapturedPhoto>>(emptyList()) }
+    var activeBriefId by remember { mutableStateOf<String?>(null) }
+
+    val scope = rememberCoroutineScope()
 
     AnteroomTheme {
         when (status) {
@@ -116,10 +147,131 @@ fun AnteroomApp(
                         authService = authService
                     )
                 } else if (currentUser != null) {
-                    DashboardScreen(
-                        user = currentUser,
-                        authService = authService
-                    )
+                    when (val screen = currentScreen) {
+                        is AppScreen.Dashboard -> {
+                            DashboardScreen(
+                                user = currentUser,
+                                authService = authService,
+                                profilesRepository = profilesRepository,
+                                briefsRepository = briefsRepository,
+                                isSubscribed = isSubscribed,
+                                onUpgradeClick = {
+                                    paywallTrigger = "general"
+                                    showPaywallModal = true
+                                },
+                                onAddProfileClick = {
+                                    if (!isSubscribed) {
+                                        paywallTrigger = "family-profiles"
+                                        showPaywallModal = true
+                                    } else {
+                                        currentScreen = AppScreen.ProfileAddEdit(null)
+                                    }
+                                },
+                                onEditProfileClick = { profileToEdit ->
+                                    currentScreen = AppScreen.ProfileAddEdit(profileToEdit)
+                                },
+                                onSnapClick = {
+                                    scope.launch {
+                                        val profiles = profilesRepository.getProfiles(currentUser.user_id)
+                                        val active = profiles.find { it.is_self } ?: profiles.firstOrNull()
+                                        val draft = briefsRepository.createBrief(
+                                            userId = currentUser.user_id,
+                                            profileId = active?.profile_id ?: "default"
+                                        )
+                                        activeBriefId = draft.brief_id
+                                        activeDraftPhotos = emptyList()
+                                        currentScreen = AppScreen.Capture(active, draft.brief_id)
+                                    }
+                                },
+                                onBriefClick = { brief ->
+                                    if (brief.status == com.zayedmd.anteroom.model.BriefStatus.draft) {
+                                        activeBriefId = brief.brief_id
+                                        currentScreen = AppScreen.Capture(null, brief.brief_id)
+                                    }
+                                }
+                            )
+                        }
+
+                        is AppScreen.Capture -> {
+                            CaptureScreen(
+                                activeProfile = screen.profile,
+                                briefId = screen.existingBriefId ?: activeBriefId,
+                                photos = activeDraftPhotos,
+                                uploadingCount = uploadingCount,
+                                errorMessage = uploadError,
+                                onPhotosCaptured = { newPhotos ->
+                                    activeDraftPhotos = activeDraftPhotos + newPhotos
+                                    val targetBriefId = screen.existingBriefId ?: activeBriefId
+                                    if (targetBriefId != null) {
+                                        scope.launch {
+                                            photoUploadService.uploadPhotos(targetBriefId, newPhotos)
+                                        }
+                                    }
+                                },
+                                onCancel = {
+                                    photoUploadService.clearError()
+                                    currentScreen = AppScreen.Dashboard
+                                },
+                                onReviewClick = {
+                                    // Proceeds to Brief Draft Review screen
+                                    currentScreen = AppScreen.Dashboard
+                                }
+                            )
+                        }
+
+                        is AppScreen.ProfileAddEdit -> {
+                            ProfileAddEditScreen(
+                                editingProfile = screen.profile,
+                                isSubscribed = isSubscribed,
+                                onBack = {
+                                    currentScreen = AppScreen.Dashboard
+                                },
+                                onSaveProfile = { name, relationship, dob, sex ->
+                                    scope.launch {
+                                        if (screen.profile != null) {
+                                            profilesRepository.updateProfile(
+                                                profileId = screen.profile.profile_id,
+                                                name = name,
+                                                relationship = relationship,
+                                                dob = dob,
+                                                sex = sex
+                                            )
+                                        } else {
+                                            profilesRepository.createProfile(
+                                                userId = currentUser.user_id,
+                                                name = name,
+                                                relationship = relationship,
+                                                dob = dob,
+                                                sex = sex
+                                            )
+                                        }
+                                        currentScreen = AppScreen.Dashboard
+                                    }
+                                },
+                                onDeleteProfile = { profileIdToDelete ->
+                                    scope.launch {
+                                        profilesRepository.deleteProfile(profileIdToDelete)
+                                        currentScreen = AppScreen.Dashboard
+                                    }
+                                },
+                                onUpgradeRequired = {
+                                    paywallTrigger = "family-profiles"
+                                    showPaywallModal = true
+                                }
+                            )
+                        }
+                    }
+
+                    if (showPaywallModal) {
+                        PaywallModal(
+                            triggerReason = paywallTrigger,
+                            onDismiss = { showPaywallModal = false },
+                            onUpgradeSuccess = {
+                                SubscriptionService.setSubscribed(true)
+                                showPaywallModal = false
+                            }
+                        )
+                    }
                 } else {
                     Box(
                         modifier = Modifier

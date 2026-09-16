@@ -86,9 +86,10 @@ class ProfilesRepositoryImpl : ProfilesRepository {
         dob: String?,
         sex: BiologicalSex?
     ): Profile {
-        val updated = memoryProfiles.value.find { it.profile_id == profileId }?.copy(
+        val existing = memoryProfiles.value.find { it.profile_id == profileId }
+        val updated = existing?.copy(
             name = name,
-            relationship = relationship,
+            relationship = if (existing.is_self) Relationship.self else relationship,
             dob = dob,
             sex = sex
         ) ?: Profile(
@@ -99,6 +100,24 @@ class ProfilesRepositoryImpl : ProfilesRepository {
             dob = dob,
             sex = sex
         )
+        if (existing != null && existing.user_id.isNotEmpty()) {
+            try {
+                FirebaseService.firestore
+                    .collection("users")
+                    .document(existing.user_id)
+                    .collection("profiles")
+                    .document(profileId)
+                    .update(
+                        mapOf(
+                            "name" to name,
+                            "relationship" to (if (existing.is_self) "self" else relationship.name),
+                            "dob" to dob,
+                            "sex" to sex?.name
+                        )
+                    )
+            } catch (_: Exception) {
+            }
+        }
         memoryProfiles.value = memoryProfiles.value.map {
             if (it.profile_id == profileId) updated else it
         }
@@ -106,6 +125,18 @@ class ProfilesRepositoryImpl : ProfilesRepository {
     }
 
     override suspend fun deleteProfile(profileId: String) {
+        val existing = memoryProfiles.value.find { it.profile_id == profileId }
+        if (existing != null && existing.user_id.isNotEmpty()) {
+            try {
+                FirebaseService.firestore
+                    .collection("users")
+                    .document(existing.user_id)
+                    .collection("profiles")
+                    .document(profileId)
+                    .delete()
+            } catch (_: Exception) {
+            }
+        }
         memoryProfiles.value = memoryProfiles.value.filter { it.profile_id != profileId }
     }
 }

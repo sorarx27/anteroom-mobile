@@ -1,8 +1,10 @@
 package com.zayedmd.anteroom.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -30,6 +32,7 @@ fun FamilyProfileStrip(
     isSubscribed: Boolean,
     onSelectProfile: (Profile) -> Unit,
     onAddProfileClick: () -> Unit,
+    onEditProfileClick: ((Profile) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val sortedProfiles = profiles.sortedWith(
@@ -52,7 +55,8 @@ fun FamilyProfileStrip(
                 profile = profile,
                 isSelected = isSelected,
                 isLocked = isLocked,
-                onClick = { onSelectProfile(profile) }
+                onClick = { onSelectProfile(profile) },
+                onLongClick = { onEditProfileClick?.invoke(profile) }
             )
         }
 
@@ -66,18 +70,23 @@ fun FamilyProfileStrip(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ProfileStripItem(
     profile: Profile,
     isSelected: Boolean,
     isLocked: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .width(64.dp)
-            .clickable { onClick() }
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
     ) {
         Box(
             modifier = Modifier.size(54.dp),

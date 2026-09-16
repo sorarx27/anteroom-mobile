@@ -49,6 +49,7 @@ kotlin {
 
     sourceSets {
         androidMain.dependencies {
+            implementation(libs.androidx.activity.compose)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
             implementation(project.dependencies.platform("com.google.firebase:firebase-bom:33.7.0"))

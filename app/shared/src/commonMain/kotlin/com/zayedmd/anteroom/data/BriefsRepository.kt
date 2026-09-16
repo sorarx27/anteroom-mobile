@@ -7,8 +7,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 interface BriefsRepository {
     suspend fun getBriefs(profileId: String?): List<Brief>
     suspend fun getBrief(briefId: String): Brief?
-    suspend fun createBrief(userId: String, profileId: String, docType: DocType): Brief
+    suspend fun createBrief(userId: String, profileId: String, docType: DocType = DocType.other): Brief
     suspend fun updateBriefDocType(briefId: String, docType: DocType): Brief?
+    suspend fun addPhotoToBrief(briefId: String, photo: BriefPhoto): Brief?
+    suspend fun removePhotoFromBrief(briefId: String, photoId: String): Brief?
     suspend fun deleteBrief(briefId: String)
 }
 
@@ -77,7 +79,43 @@ class BriefsRepositoryImpl : BriefsRepository {
         return updated
     }
 
+    override suspend fun addPhotoToBrief(briefId: String, photo: BriefPhoto): Brief? {
+        val existing = memoryBriefs.value.find { it.brief_id == briefId } ?: return null
+        val updatedPhotos = existing.photos + photo
+        val updated = existing.copy(photos = updatedPhotos)
+        memoryBriefs.value = memoryBriefs.value.map {
+            if (it.brief_id == briefId) updated else it
+        }
+        try {
+            FirebaseService.firestore.collection("briefs").document(briefId).update(
+                mapOf("photos" to updatedPhotos)
+            )
+        } catch (_: Exception) {
+        }
+        return updated
+    }
+
+    override suspend fun removePhotoFromBrief(briefId: String, photoId: String): Brief? {
+        val existing = memoryBriefs.value.find { it.brief_id == briefId } ?: return null
+        val updatedPhotos = existing.photos.filter { it.photo_id != photoId }
+        val updated = existing.copy(photos = updatedPhotos)
+        memoryBriefs.value = memoryBriefs.value.map {
+            if (it.brief_id == briefId) updated else it
+        }
+        try {
+            FirebaseService.firestore.collection("briefs").document(briefId).update(
+                mapOf("photos" to updatedPhotos)
+            )
+        } catch (_: Exception) {
+        }
+        return updated
+    }
+
     override suspend fun deleteBrief(briefId: String) {
         memoryBriefs.value = memoryBriefs.value.filter { it.brief_id != briefId }
+        try {
+            FirebaseService.firestore.collection("briefs").document(briefId).delete()
+        } catch (_: Exception) {
+        }
     }
 }
