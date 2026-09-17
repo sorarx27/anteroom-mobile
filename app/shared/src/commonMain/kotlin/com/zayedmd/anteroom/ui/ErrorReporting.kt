@@ -66,6 +66,15 @@ fun Throwable.userMessage(): String {
         raw.contains("UNAUTHENTICATED", ignoreCase = true) ->
             "Your session expired. Sign in again to continue."
 
+        // A callable that isn't deployed -- or is deployed to a different
+        // region than FirebaseService.FUNCTIONS_REGION -- comes back as a bare
+        // NOT_FOUND that names neither the function nor the region. A missing
+        // Firestore document does not take this path; `get` on one returns a
+        // snapshot with exists = false rather than throwing.
+        raw.contains("NOT_FOUND", ignoreCase = true) ||
+            raw.contains("UNIMPLEMENTED", ignoreCase = true) ->
+            "Document processing isn't available yet."
+
         raw.isNotBlank() -> raw
         else -> "Something went wrong. Please try again."
     }
