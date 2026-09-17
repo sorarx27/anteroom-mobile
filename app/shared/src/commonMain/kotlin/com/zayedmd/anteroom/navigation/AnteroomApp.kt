@@ -23,6 +23,7 @@ import com.zayedmd.anteroom.data.BriefsRepositoryImpl
 import com.zayedmd.anteroom.data.PhotoUploadService
 import com.zayedmd.anteroom.data.ProfilesRepository
 import com.zayedmd.anteroom.data.ProfilesRepositoryImpl
+import com.zayedmd.anteroom.debug.DebugOptions
 import com.zayedmd.anteroom.media.CapturedPhoto
 import com.zayedmd.anteroom.model.Brief
 import com.zayedmd.anteroom.model.Profile
@@ -73,6 +74,14 @@ fun AnteroomApp(
     var activeBriefId by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
+
+    // Simulator QA path only - see DebugOptions. Unreachable from a normal launch.
+    LaunchedEffect(status) {
+        if (DebugOptions.openPaywallOnLaunch && status == AuthStatus.Authenticated) {
+            paywallTrigger = "general"
+            showPaywallModal = true
+        }
+    }
 
     // Configure RevenueCat once, then re-key the purchase identity whenever the signed-in user
     // changes so entitlements follow the Anteroom account rather than the device.

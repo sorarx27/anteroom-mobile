@@ -9,6 +9,9 @@ struct iOSApp: App {
         // wrappers call into FIRApp, so this has to happen before any repository is touched.
         FirebaseApp.configure()
 
+        // Simulator QA flags. A normally launched app passes no arguments, so these stay off.
+        IosLaunchArgumentsKt.applyDebugLaunchArguments()
+
         // Configure StoreKit through purchases-kmp before the first Compose frame, so the
         // offerings cache is warm by the time the paywall can be reached. The API key is
         // resolved in Kotlin (RevenueCatConfig.iosApiKey): the appl_ App Store key when one
