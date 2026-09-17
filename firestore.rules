@@ -1,0 +1,135 @@
+rules_version = '2';
+
+// Anteroom Firestore rules.
+//
+// Framing: the Admin SDK inside Cloud Functions bypasses every rule here, so
+// these exist for exactly one purpose — to constrain the Kotlin client.
+// "Server-write-only" is implemented as "client-write-never"; the functions
+// then get those fields for free.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function uid()      { return request.auth.uid; }
+
+    // Clinical fields. Only Cloud Functions may ever create or change these.
+    // `content` in particular is extracted medical data, and `flagged_items`
+    // inside it is the safety mechanism — neither may originate on a client.
+    function briefServerFields() {
+      return [
+        'content', 'content_translations', 'status', 'generated_at',
+        'share_token', 'share_expires_at', 'share_url_path',
+        'source_language', 'available_languages',
+        'detected_doc_type', 'detected_confidence', 'last_error'
+      ];
+    }
+
+    function docTypes() {
+      return ['referral', 'med_list', 'lab_result', 'other'];
+    }
+
+    function untouched(field) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([field]);
+    }
+
+    // ------------------------------------------------------------- users
+    match /users/{userId} {
+      allow read:   if signedIn() && uid() == userId;
+      allow create: if signedIn() && uid() == userId
+                    && request.resource.data.user_id == userId;
+      allow update: if signedIn() && uid() == userId
+                    && request.resource.data.user_id == resource.data.user_id;
+      allow delete: if false;
+
+      // The "exactly one self profile" invariant is structural rather than a
+      // predicate: security rules cannot count documents, so the self profile
+      // is pinned to the fixed document id `self`. The collection physically
+      // cannot hold two, and the rule only has to enforce the biconditional.
+      match /profiles/{profileId} {
+        function isSelfDoc() { return profileId == 'self'; }
+
+        allow read: if signedIn() && uid() == userId;
+
+        allow create: if signedIn() && uid() == userId
+                      && request.resource.data.user_id == userId
+                      && request.resource.data.is_self == isSelfDoc()
+                      && (request.resource.data.relationship == 'self') == isSelfDoc()
+                      && request.resource.data.name is string
+                      && request.resource.data.name.size() > 0
+                      && request.resource.data.name.size() <= 120;
+
+        allow update: if signedIn() && uid() == userId
+                      && request.resource.data.user_id == resource.data.user_id
+                      && request.resource.data.is_self == resource.data.is_self
+                      && (!isSelfDoc() || request.resource.data.relationship == 'self');
+
+        // Deleting your own self profile would orphan every brief pointing at it.
+        allow delete: if signedIn() && uid() == userId && !isSelfDoc();
+      }
+
+      // Written only by the RevenueCat webhook. These live in a subcollection
+      // rather than on the user document because AuthServiceImpl does a full
+      // .set() on users/{uid}, which would otherwise clobber the entitlement
+      // every time someone edits their profile.
+      match /billing/{docId} {
+        allow read:  if signedIn() && uid() == userId;
+        allow write: if false;
+      }
+
+      // Per-user daily model quota. Server-maintained; the client may read it
+      // to show "3 of 3 used today" but must never move the counter.
+      match /usage/{docId} {
+        allow read:  if signedIn() && uid() == userId;
+        allow write: if false;
+      }
+    }
+
+    // ------------------------------------------------------------ briefs
+    match /briefs/{briefId} {
+
+      // Covers get AND list. For a list, Firestore refuses the query unless
+      // the client's own where-clauses prove every result satisfies this.
+      // That is what forces the missing user_id predicate into getBriefs():
+      // without it every user's briefs leak to every other user, because
+      // profile_id is the literal string "self" for everybody.
+      allow read: if signedIn() && resource.data.user_id == uid();
+
+      allow create: if signedIn()
+        && request.resource.data.user_id == uid()
+        && request.resource.data.brief_id == briefId
+        && request.resource.data.status == 'draft'
+        && request.resource.data.doc_type in docTypes()
+        && request.resource.data.doc_type_manual_override is bool
+        && request.resource.data.photos.size() == 0
+        && request.resource.data.profile_id is string
+        && exists(/databases/$(database)/documents/users/$(uid())/profiles/$(request.resource.data.profile_id))
+        && !request.resource.data.keys().hasAny(briefServerFields());
+
+      allow update: if signedIn()
+        && resource.data.user_id == uid()
+        && request.resource.data.user_id   == resource.data.user_id
+        && request.resource.data.brief_id  == resource.data.brief_id
+        && request.resource.data.profile_id == resource.data.profile_id
+        && request.resource.data.doc_type in docTypes()
+        // Mirrors MAX_PAGES in functions/anteroom/config.py and
+        // StoragePaths.MAX_PAGES. The model call is priced per page, so this
+        // is the spend ceiling as much as it is a product limit.
+        && request.resource.data.photos.size() <= 6
+        && !request.resource.data.diff(resource.data)
+              .affectedKeys().hasAny(briefServerFields());
+
+      allow delete: if signedIn() && resource.data.user_id == uid();
+    }
+
+    // Share-token lookup table for the public brief page. The token is the
+    // document id, so resolving one is a single O(1) get from a function.
+    // The client has no business reading or writing it.
+    match /share_tokens/{token} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

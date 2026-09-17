@@ -16,9 +16,19 @@ import dev.gitlive.firebase.storage.storage
  * failure scoped to the property that is genuinely unavailable.
  */
 object FirebaseService {
+
+    /**
+     * Must match `REGION` in `functions/anteroom/config.py`. Firestore for
+     * this project is `eur3`, so the functions live in europe-west1 to keep
+     * data in the EU and avoid a transatlantic hop per call. GitLive defaults
+     * to us-central1, and a mismatch surfaces as an opaque NOT_FOUND rather
+     * than anything that mentions regions.
+     */
+    const val FUNCTIONS_REGION = "europe-west1"
+
     val auth by lazy { Firebase.auth }
     val firestore by lazy { Firebase.firestore }
-    val functions by lazy { Firebase.functions }
+    val functions by lazy { Firebase.functions(FUNCTIONS_REGION) }
     val storage by lazy { Firebase.storage }
 
     /**

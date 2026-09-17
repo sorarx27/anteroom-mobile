@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// Anteroom Storage rules.
+//
+// Two prefixes per brief. `pages/` is what the phone uploads and what
+// generateBrief reads back via the Admin SDK. `exports/` is rendered PDFs,
+// which only the Admin SDK may write — that is what keeps the watermark
+// decision server-side instead of being a query parameter the client picks.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    match /users/{uid}/briefs/{briefId}/pages/{photoFile} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      // Limits mirror the old FastAPI build's MAX_PHOTO_BYTES and
+      // ALLOWED_CONTENT_TYPES. Enforced here rather than only in the client,
+      // where PhotoUploadService checked a size field that was always 0 on
+      // every target except Android.
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.size <= 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)')
+        && photoFile.matches('photo_[A-Za-z0-9]+\\.(jpg|png|webp)');
+
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{uid}/briefs/{briefId}/exports/{pdfFile} {
+      allow read:  if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -136,21 +137,29 @@ fun SourcePageThumbnail(
             .width(88.dp)
             .height(116.dp)
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+        Box(modifier = Modifier.fillMaxSize()) {
+            BriefPhotoImage(
+                photo = photo,
+                contentDescription = "Source page ${pageIndex + 1}",
+                modifier = Modifier.fillMaxSize(),
+                backgroundColor = Color(0xFFEBEFED)
+            )
+
+            // On a scrim, because the label now sits on top of a photograph
+            // whose brightness we don't control.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xCC000000))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
-                Text(text = "📄", fontSize = 28.sp)
-                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = "Page ${pageIndex + 1}",
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = AnteroomColors.BrandPrimary
+                    color = Color.White
                 )
             }
 
@@ -237,44 +246,32 @@ fun PhotoVerificationModal(
                         .fillMaxWidth()
                         .fillMaxHeight(0.85f)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(text = "📄", fontSize = 64.sp)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Original Document Preview",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AnteroomColors.OnSurface
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Source: ${photo.filename.ifBlank { "Page_${pageIndex + 1}.jpg" }}",
-                            fontSize = 13.sp,
-                            color = AnteroomColors.Muted
-                        )
-                        Spacer(modifier = Modifier.height(20.dp))
-                        Surface(
-                            color = AnteroomColors.SurfaceSecondary,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                        ) {
-                            Text(
-                                text = "High-resolution source rendering active for clinical cross-examination.",
-                                fontSize = 12.sp,
-                                textAlign = TextAlign.Center,
-                                color = AnteroomColors.Muted,
-                                modifier = Modifier.padding(12.dp)
-                            )
-                        }
-                    }
+                    BriefPhotoImage(
+                        photo = photo,
+                        contentDescription = "Original document, page ${pageIndex + 1}",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        glyphSize = 64.sp,
+                        backgroundColor = Color.White
+                    )
                 }
             }
+
+            // Filename caption. What used to sit here was the sentence
+            // "High-resolution source rendering active for clinical
+            // cross-examination." printed under an emoji, with no image
+            // anywhere in the app -- a claim about a capability that did not
+            // exist. The image above is the claim now.
+            Text(
+                text = photo.filename.ifBlank { "Page ${pageIndex + 1}" },
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+                color = Color.White.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 20.dp)
+            )
         }
     }
 }

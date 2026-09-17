@@ -31,6 +31,7 @@ import com.zayedmd.anteroom.subscription.AnteroomPurchases
 import com.zayedmd.anteroom.subscription.RevenueCatService
 import com.zayedmd.anteroom.subscription.SubscriptionService
 import com.zayedmd.anteroom.subscription.defaultRevenueCatApiKey
+import com.zayedmd.anteroom.ui.ConfigureImageLoading
 import com.zayedmd.anteroom.ui.components.PaywallModal
 import com.zayedmd.anteroom.ui.screens.*
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
@@ -58,6 +59,8 @@ fun AnteroomApp(
     briefsRepository: BriefsRepository = remember { BriefsRepositoryImpl() },
     revenueCatService: RevenueCatService = AnteroomPurchases.service
 ) {
+    ConfigureImageLoading()
+
     val status by authService.status.collectAsState()
     val user by authService.user.collectAsState()
     val isSubscribed by SubscriptionService.isSubscribed.collectAsState()

@@ -6,6 +6,9 @@ plugins {
     alias(libs.plugins.androidMultiplatformLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    // Needed for the @Serializable callable request payloads in
+    // data/BriefsRepository.kt. :core already applies it for the models.
+    alias(libs.plugins.kotlinxSerialization)
 }
 
 kotlin {
@@ -68,10 +71,15 @@ kotlin {
             implementation(project.dependencies.platform("com.google.firebase:firebase-bom:33.7.0"))
             implementation(libs.purchases.core)
             implementation(libs.purchases.result)
+            implementation(libs.ktor.client.okhttp)
         }
         iosMain.dependencies {
             implementation(libs.purchases.core)
             implementation(libs.purchases.result)
+            implementation(libs.ktor.client.darwin)
+        }
+        jvmMain.dependencies {
+            implementation(libs.ktor.client.okhttp)
         }
         commonMain.dependencies {
             api(project(":core"))
@@ -95,12 +103,14 @@ kotlin {
             implementation(libs.gitlive.firebase.functions)
             implementation(libs.kotlinx.datetime)
             implementation(libs.coil.compose)
+            implementation(libs.coil.network.ktor)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
         jsMain.dependencies {
             implementation(libs.wrappers.browser)
+            implementation(libs.ktor.client.js)
         }
     }
 }

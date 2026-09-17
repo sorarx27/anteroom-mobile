@@ -143,24 +143,13 @@ fun DraftPhotoCard(
             .border(1.dp, AnteroomColors.Border, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
     ) {
-        // Document representation placeholder / thumbnail background
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFE9ECEF)),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(text = "📄", fontSize = 28.sp)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Page $pageIndex",
-                    fontSize = 12.sp,
-                    color = AnteroomColors.Muted,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
+        // The page itself. The numbered badge below already says which page
+        // this is, so the thumbnail is given over entirely to the image.
+        BriefPhotoImage(
+            photo = photo,
+            contentDescription = "Page $pageIndex",
+            modifier = Modifier.fillMaxSize()
+        )
 
         // Page Number Indicator Badge (top-left)
         Box(
@@ -287,31 +276,17 @@ fun FullscreenPhotoInspectionModal(
                         .fillMaxWidth(0.9f)
                         .fillMaxHeight(0.75f)
                 ) {
-                    Box(
+                    // ContentScale.Fit, not Crop: this is the view a clinician
+                    // uses to check a dosage against the original, so nothing
+                    // may be cropped out of frame.
+                    BriefPhotoImage(
+                        photo = photo,
+                        contentDescription = "Page $pageIndex of $totalPages",
                         modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(24.dp)
-                        ) {
-                            Text(text = "📄", fontSize = 64.sp)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Medical Document Page $pageIndex",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                                color = Color.Black
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Full-resolution inspection view\nAll text, labels, and dosages should be legible.",
-                                textAlign = TextAlign.Center,
-                                fontSize = 13.sp,
-                                color = Color.Gray
-                            )
-                        }
-                    }
+                        contentScale = ContentScale.Fit,
+                        glyphSize = 64.sp,
+                        backgroundColor = Color.White
+                    )
                 }
             }
         }

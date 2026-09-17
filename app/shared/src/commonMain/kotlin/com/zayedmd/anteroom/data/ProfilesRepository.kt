@@ -5,45 +5,69 @@ import com.zayedmd.anteroom.model.BiologicalSex
 import com.zayedmd.anteroom.model.Profile
 import com.zayedmd.anteroom.model.Relationship
 import dev.gitlive.firebase.firestore.Direction
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 interface ProfilesRepository {
     suspend fun getProfiles(userId: String): List<Profile>
-    suspend fun createProfile(userId: String, name: String, relationship: Relationship, dob: String?, sex: BiologicalSex?): Profile
-    suspend fun updateProfile(profileId: String, name: String, relationship: Relationship, dob: String?, sex: BiologicalSex?): Profile
+    suspend fun createProfile(
+        userId: String,
+        name: String,
+        relationship: Relationship,
+        dob: String?,
+        sex: BiologicalSex?
+    ): Profile
+
+    suspend fun updateProfile(
+        profileId: String,
+        name: String,
+        relationship: Relationship,
+        dob: String?,
+        sex: BiologicalSex?
+    ): Profile
+
     suspend fun deleteProfile(profileId: String)
+
+    /** Creates the user's own profile if it isn't there yet. Idempotent. */
+    suspend fun ensureSelfProfile(userId: String, displayName: String): Profile
 }
 
+/**
+ * Firestore-backed profiles, stored at `users/{uid}/profiles/{profileId}`.
+ *
+ * There is deliberately no in-memory fallback. The previous implementation
+ * caught every Firestore failure and returned `MockData.sampleProfiles`, which
+ * meant a permission error, an offline device and an empty account all looked
+ * identical — and identical to success. Failures now propagate so the UI can
+ * say what went wrong.
+ */
 class ProfilesRepositoryImpl : ProfilesRepository {
-    private val memoryProfiles = MutableStateFlow<List<Profile>>(MockData.sampleProfiles)
 
-    override suspend fun getProfiles(userId: String): List<Profile> {
-        return try {
-            val snapshot = FirebaseService.firestore
-                .collection("users")
-                .document(userId)
-                .collection("profiles")
-                .orderBy("created_at", Direction.ASCENDING)
-                .get()
+    private fun profiles(userId: String) =
+        FirebaseService.firestore.collection("users").document(userId).collection("profiles")
 
-            if (snapshot.documents.isNotEmpty()) {
-                snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.data<Profile>()
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
-            } else {
-                // If remote is empty, return memory/sample profiles for this user
-                memoryProfiles.value
-            }
-        } catch (e: Exception) {
-            // Fallback gracefully to local mock profiles if offline or unauthenticated
-            memoryProfiles.value
-        }
+    override suspend fun getProfiles(userId: String): List<Profile> =
+        profiles(userId)
+            .orderBy("created_at", Direction.ASCENDING)
+            .get()
+            .documents
+            .map { it.data<Profile>() }
+
+    override suspend fun ensureSelfProfile(userId: String, displayName: String): Profile {
+        val ref = profiles(userId).document(SELF_PROFILE_ID)
+        val existing = ref.get()
+        if (existing.exists) return existing.data<Profile>()
+
+        val now = nowIso()
+        val self = Profile(
+            profile_id = SELF_PROFILE_ID,
+            user_id = userId,
+            name = displayName.ifBlank { "You" },
+            relationship = Relationship.self,
+            is_self = true,
+            created_at = now,
+            updated_at = now
+        )
+        ref.set(self)
+        return self
     }
 
     override suspend fun createProfile(
@@ -53,30 +77,25 @@ class ProfilesRepositoryImpl : ProfilesRepository {
         dob: String?,
         sex: BiologicalSex?
     ): Profile {
-        val newId = "prof_${kotlin.random.Random.nextInt(100000, 999999)}"
-        val newProfile = Profile(
-            profile_id = newId,
+        // Firestore generates the id. The old client-side random in a 900k
+        // space was a real collision surface, and `self` is reserved.
+        val ref = profiles(userId).document
+        val now = nowIso()
+        val profile = Profile(
+            profile_id = ref.id,
             user_id = userId,
             name = name,
-            relationship = relationship,
+            // `self` is created only by ensureSelfProfile; security rules
+            // reject relationship == self on any other document id.
+            relationship = if (relationship == Relationship.self) Relationship.other else relationship,
             dob = dob,
             sex = sex,
             is_self = false,
-            created_at = "2026-09-16T12:00:00Z",
-            updated_at = "2026-09-16T12:00:00Z"
+            created_at = now,
+            updated_at = now
         )
-        try {
-            FirebaseService.firestore
-                .collection("users")
-                .document(userId)
-                .collection("profiles")
-                .document(newId)
-                .set(newProfile)
-        } catch (_: Exception) {
-            // Keep in memory if firestore call fails
-        }
-        memoryProfiles.value = memoryProfiles.value + newProfile
-        return newProfile
+        ref.set(profile)
+        return profile
     }
 
     override suspend fun updateProfile(
@@ -86,57 +105,28 @@ class ProfilesRepositoryImpl : ProfilesRepository {
         dob: String?,
         sex: BiologicalSex?
     ): Profile {
-        val existing = memoryProfiles.value.find { it.profile_id == profileId }
-        val updated = existing?.copy(
+        val userId = requireUid()
+        val ref = profiles(userId).document(profileId)
+        val snapshot = ref.get()
+        if (!snapshot.exists) throw NoSuchElementException("Profile not found")
+        val existing = snapshot.data<Profile>()
+
+        val updated = existing.copy(
             name = name,
             relationship = if (existing.is_self) Relationship.self else relationship,
             dob = dob,
-            sex = sex
-        ) ?: Profile(
-            profile_id = profileId,
-            user_id = "",
-            name = name,
-            relationship = relationship,
-            dob = dob,
-            sex = sex
+            sex = sex,
+            updated_at = nowIso()
         )
-        if (existing != null && existing.user_id.isNotEmpty()) {
-            try {
-                FirebaseService.firestore
-                    .collection("users")
-                    .document(existing.user_id)
-                    .collection("profiles")
-                    .document(profileId)
-                    .update(
-                        mapOf(
-                            "name" to name,
-                            "relationship" to (if (existing.is_self) "self" else relationship.name),
-                            "dob" to dob,
-                            "sex" to sex?.name
-                        )
-                    )
-            } catch (_: Exception) {
-            }
-        }
-        memoryProfiles.value = memoryProfiles.value.map {
-            if (it.profile_id == profileId) updated else it
-        }
+        ref.set(updated)
         return updated
     }
 
     override suspend fun deleteProfile(profileId: String) {
-        val existing = memoryProfiles.value.find { it.profile_id == profileId }
-        if (existing != null && existing.user_id.isNotEmpty()) {
-            try {
-                FirebaseService.firestore
-                    .collection("users")
-                    .document(existing.user_id)
-                    .collection("profiles")
-                    .document(profileId)
-                    .delete()
-            } catch (_: Exception) {
-            }
+        if (profileId == SELF_PROFILE_ID) {
+            // Would orphan every brief pointing at it; rules reject it anyway.
+            throw IllegalArgumentException("You can't delete your own profile.")
         }
-        memoryProfiles.value = memoryProfiles.value.filter { it.profile_id != profileId }
+        profiles(requireUid()).document(profileId).delete()
     }
 }

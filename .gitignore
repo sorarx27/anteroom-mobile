@@ -25,3 +25,6 @@ sample-native-app/
 functions/venv/
 functions/__pycache__/
 functions/**/__pycache__/
+
+# Session scratch (kapture helper, build probes) - not part of the app.
+scratchpad/

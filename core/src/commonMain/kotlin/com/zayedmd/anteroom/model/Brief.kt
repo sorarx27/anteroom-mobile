@@ -18,7 +18,16 @@ enum class DocType(val key: String, val label: String, val icon: String) {
 @Serializable
 enum class BriefStatus {
     draft,
-    complete
+
+    /** Set by generateBrief before it calls the model, so a client that
+     *  reconnects mid-extraction sees work in progress rather than a draft. */
+    generating,
+    complete,
+
+    /** generateBrief failed after it had already claimed the brief. Paired
+     *  with [Brief.last_error] so the UI can explain itself and offer a retry
+     *  instead of spinning forever. */
+    failed
 }
 
 @Serializable
@@ -45,6 +54,14 @@ data class BriefPhoto(
     val filename: String = "",
     val content_type: String = "image/jpeg",
     val size: Long = 0L,
+
+    /** Object path inside the Firebase Storage bucket, for example
+     *  `users/{uid}/briefs/{briefId}/pages/photo_ab12cd34.jpg`. This is the
+     *  canonical reference and what Cloud Functions read bytes from. */
+    val storage_path: String = "",
+
+    /** Download URL, used only for rendering on the client. Empty until the
+     *  upload completes. */
     val url: String = ""
 )
 
@@ -95,6 +112,20 @@ data class Brief(
     val available_languages: List<BriefLanguage> = emptyList(),
     val generated_at: String? = null,
     val share_url_path: String? = null,
+
+    /** Random token backing the public share page. Server-written; the client
+     *  may read its own but can never set it. */
+    val share_token: String? = null,
+    val share_expires_at: String? = null,
+
+    /** Populated alongside [BriefStatus.failed]. */
+    val last_error: String? = null,
+
+    // ISO-8601 UTC strings, never Firestore Timestamps. The Python Admin SDK
+    // writes a datetime as a Timestamp, which would not decode into these
+    // String fields — and BriefsRepository would swallow the error and make
+    // the brief vanish from the dashboard. ISO-8601 UTC also sorts
+    // lexicographically, so orderBy still works.
     val created_at: String = "",
     val updated_at: String = ""
 )
