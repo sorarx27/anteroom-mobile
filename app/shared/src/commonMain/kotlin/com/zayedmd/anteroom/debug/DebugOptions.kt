@@ -23,6 +23,7 @@ object DebugOptions {
     const val ARG_DEMO_AUTH = "--anteroom-demo-auth"
     const val ARG_OPEN_PAYWALL = "--anteroom-open-paywall"
     const val ARG_AUTO_PURCHASE = "--anteroom-autobuy"
+    const val ARG_OPEN_BRIEF = "--anteroom-open-brief"
 
     /** Skip Firebase auth and sign in a local, throwaway user. */
     var demoAuth: Boolean = false
@@ -40,11 +41,19 @@ object DebugOptions {
     var autoPurchase: Boolean = false
         private set
 
+    /** Jump straight to [DEMO_BRIEF_ID] so the clinical brief can be captured. */
+    var openBriefOnLaunch: Boolean = false
+        private set
+
     fun applyLaunchArguments(arguments: List<String>) {
         demoAuth = arguments.contains(ARG_DEMO_AUTH)
         openPaywallOnLaunch = arguments.contains(ARG_OPEN_PAYWALL)
         autoPurchase = arguments.contains(ARG_AUTO_PURCHASE)
+        openBriefOnLaunch = arguments.contains(ARG_OPEN_BRIEF)
     }
+
+    /** A completed sample brief that carries flagged items. */
+    const val DEMO_BRIEF_ID = "br_001"
 
     /**
      * `profile_completed = true` so [com.zayedmd.anteroom.navigation.AnteroomApp] routes straight

@@ -77,7 +77,11 @@ fun AnteroomApp(
 
     // Simulator QA path only - see DebugOptions. Unreachable from a normal launch.
     LaunchedEffect(status) {
-        if (DebugOptions.openPaywallOnLaunch && status == AuthStatus.Authenticated) {
+        if (status != AuthStatus.Authenticated) return@LaunchedEffect
+        if (DebugOptions.openBriefOnLaunch) {
+            currentScreen = AppScreen.BriefView(DebugOptions.DEMO_BRIEF_ID)
+        }
+        if (DebugOptions.openPaywallOnLaunch) {
             paywallTrigger = "general"
             showPaywallModal = true
         }
