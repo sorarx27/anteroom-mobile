@@ -13,7 +13,8 @@ import com.zayedmd.anteroom.model.AppUser
  *
  * To drive it on a simulator:
  * ```
- * xcrun simctl launch booted com.zayedmd.anteroom --anteroom-demo-auth --anteroom-open-paywall
+ * xcrun simctl launch booted com.zayedmd.anteroom \
+ *   --anteroom-demo-auth --anteroom-open-paywall --anteroom-autobuy
  * ```
  *
  * Delete this file (and its three call sites) once the demo video is recorded.
@@ -21,6 +22,7 @@ import com.zayedmd.anteroom.model.AppUser
 object DebugOptions {
     const val ARG_DEMO_AUTH = "--anteroom-demo-auth"
     const val ARG_OPEN_PAYWALL = "--anteroom-open-paywall"
+    const val ARG_AUTO_PURCHASE = "--anteroom-autobuy"
 
     /** Skip Firebase auth and sign in a local, throwaway user. */
     var demoAuth: Boolean = false
@@ -30,9 +32,18 @@ object DebugOptions {
     var openPaywallOnLaunch: Boolean = false
         private set
 
+    /**
+     * Run the paywall's purchase call once offerings have loaded. This invokes exactly the same
+     * [com.zayedmd.anteroom.subscription.RevenueCatService.purchasePackage] the CTA does - it
+     * substitutes for the tap only, not for the billing path.
+     */
+    var autoPurchase: Boolean = false
+        private set
+
     fun applyLaunchArguments(arguments: List<String>) {
         demoAuth = arguments.contains(ARG_DEMO_AUTH)
         openPaywallOnLaunch = arguments.contains(ARG_OPEN_PAYWALL)
+        autoPurchase = arguments.contains(ARG_AUTO_PURCHASE)
     }
 
     /**

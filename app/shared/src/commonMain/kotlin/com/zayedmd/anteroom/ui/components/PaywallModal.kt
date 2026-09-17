@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.zayedmd.anteroom.debug.DebugOptions
 import com.zayedmd.anteroom.subscription.AnteroomPurchases
 import com.zayedmd.anteroom.subscription.RevenueCatConfig
 import com.zayedmd.anteroom.subscription.RevenueCatService
@@ -52,6 +53,9 @@ fun PaywallModal(
         if (isSubscribed) onUpgradeSuccess()
     }
 
+    // Simulator QA path only - see DebugOptions. Unreachable from a normal launch.
+    var autoPurchaseFired by remember { mutableStateOf(false) }
+
     val packages = remember(offering) {
         offering?.availablePackages?.takeIf { it.isNotEmpty() } ?: listOf(
             RevenueCatConfig.FALLBACK_MONTHLY,
@@ -61,6 +65,17 @@ fun PaywallModal(
 
     var selectedPkgId by remember(packages) {
         mutableStateOf(packages.firstOrNull()?.identifier ?: RevenueCatConfig.PACKAGE_MONTHLY)
+    }
+
+    // Simulator QA path only - see DebugOptions. Runs the same call the CTA runs, once.
+    LaunchedEffect(packages) {
+        if (DebugOptions.autoPurchase && !autoPurchaseFired && !isSubscribed) {
+            autoPurchaseFired = true
+            val target = packages.find { it.identifier == selectedPkgId } ?: packages.firstOrNull()
+            if (target != null && revenueCatService.purchasePackage(target).getOrDefault(false)) {
+                onUpgradeSuccess()
+            }
+        }
     }
 
     Dialog(
