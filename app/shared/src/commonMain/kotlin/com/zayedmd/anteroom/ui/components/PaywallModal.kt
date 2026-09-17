@@ -19,7 +19,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.zayedmd.anteroom.debug.DebugOptions
 import com.zayedmd.anteroom.subscription.AnteroomPurchases
 import com.zayedmd.anteroom.subscription.RevenueCatConfig
@@ -85,10 +84,7 @@ fun PaywallModal(
                 onDismiss()
             }
         },
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            scrimColor = AnteroomColors.Surface
-        )
+        properties = paywallDialogProperties()
     ) {
         Surface(
             modifier = Modifier

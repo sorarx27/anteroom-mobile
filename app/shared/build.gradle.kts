@@ -55,6 +55,12 @@ kotlin {
         androidMain.get().kotlin.srcDir("src/mobileMain/kotlin")
         iosMain.get().kotlin.srcDir("src/mobileMain/kotlin")
 
+        // Compose Multiplatform's skiko-backed targets share API that the Android actual lacks
+        // (DialogProperties.scrimColor). Same one-directory trick as mobileMain.
+        iosMain.get().kotlin.srcDir("src/skikoMain/kotlin")
+        jvmMain.get().kotlin.srcDir("src/skikoMain/kotlin")
+        jsMain.get().kotlin.srcDir("src/skikoMain/kotlin")
+
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.compose.uiToolingPreview)
