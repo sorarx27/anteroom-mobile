@@ -27,12 +27,26 @@ object RevenueCatConfig {
     /** RevenueCat Test Store key. Sandbox only, but valid on every platform. */
     const val TEST_API_KEY = "test_SdRJzVajoxUcFiSJfAajtpCNWvP"
 
-    /** Paste the `appl_...` App Store key here the moment RevenueCat issues one. */
-    const val IOS_APP_STORE_API_KEY = ""
+    /** App Store public SDK key for the `Anteroom (App Store)` RevenueCat app. */
+    const val IOS_APP_STORE_API_KEY = "appl_afIJabCFOZJzGwDmZQtaYaXAtJS"
 
-    /** App Store key once it exists, Test Store key until then. */
+    /**
+     * Which store iOS talks to.
+     *
+     * Keep this false until `monthly` and `lifetime` exist as in-app purchases in App Store
+     * Connect. The App Store key resolves products through StoreKit, so flipping it early gives
+     * an offering with no packages and the paywall drops to [FALLBACK_OFFERING] pricing.
+     * The Test Store key needs no App Store Connect setup, which is what makes the simulator
+     * demo work today.
+     *
+     * Flip to true before any TestFlight build that goes through App Review - RevenueCat warns
+     * that a Test Store key is grounds for rejection.
+     */
+    const val IOS_USE_APP_STORE = false
+
+    /** App Store key once the products exist, Test Store key until then. */
     val iosApiKey: String
-        get() = IOS_APP_STORE_API_KEY.ifBlank { TEST_API_KEY }
+        get() = if (IOS_USE_APP_STORE) IOS_APP_STORE_API_KEY else TEST_API_KEY
 
     val FALLBACK_MONTHLY = SubscriptionPackage(
         identifier = PACKAGE_MONTHLY,

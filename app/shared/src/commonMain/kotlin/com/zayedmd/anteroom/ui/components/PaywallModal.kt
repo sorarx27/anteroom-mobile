@@ -70,7 +70,10 @@ fun PaywallModal(
                 onDismiss()
             }
         },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            scrimColor = AnteroomColors.Surface
+        )
     ) {
         Surface(
             modifier = Modifier
@@ -88,7 +91,7 @@ fun PaywallModal(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -122,7 +125,7 @@ fun PaywallModal(
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Title & pitch
                     Text(
@@ -132,17 +135,17 @@ fun PaywallModal(
                             "translate" -> "Instant translation with Pro"
                             else -> "Unlock the full power of Anteroom"
                         },
-                        fontSize = 24.sp,
+                        fontSize = 21.sp,
                         fontWeight = FontWeight.Bold,
                         color = AnteroomColors.OnSurface,
-                        lineHeight = 30.sp
+                        lineHeight = 26.sp
                     )
 
                     Text(
                         text = "Manage health paperwork for your kids, partner, or parents with watermark-free doctor summaries and instant translation.",
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         color = AnteroomColors.OnSurfaceSecondary,
-                        lineHeight = 20.sp
+                        lineHeight = 18.sp
                     )
 
                     // Features list
@@ -151,8 +154,8 @@ fun PaywallModal(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
                             .background(AnteroomColors.SurfaceSecondary)
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         ProFeatureRow(
                             icon = "👥",
@@ -195,38 +198,39 @@ fun PaywallModal(
                                     shape = RoundedCornerShape(14.dp)
                                 )
                                 .clickable(enabled = !isProcessing) { selectedPkgId = pkg.identifier }
-                                .padding(16.dp)
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Text(
-                                            text = if (pkg.isLifetime) "Lifetime access" else "Monthly plan",
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = AnteroomColors.OnSurface
-                                        )
-                                        if (pkg.isLifetime) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(999.dp))
-                                                    .background(AnteroomColors.BrandPrimary)
-                                                    .padding(horizontal = 8.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(
-                                                    text = "Pay once, keep forever",
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White
-                                                )
-                                            }
+                                // Weighted so a long store price (US$99.99) never squeezes the
+                                // price column into a two- or three-line wrap.
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Text(
+                                        text = if (pkg.isLifetime) "Lifetime access" else "Monthly plan",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = AnteroomColors.OnSurface
+                                    )
+                                    if (pkg.isLifetime) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(999.dp))
+                                                .background(AnteroomColors.BrandPrimary)
+                                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "Pay once, keep forever",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White,
+                                                maxLines = 1
+                                            )
                                         }
                                     }
                                     Text(
@@ -240,7 +244,9 @@ fun PaywallModal(
                                     text = pkg.priceString,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = AnteroomColors.BrandPrimary
+                                    color = AnteroomColors.BrandPrimary,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         }
@@ -257,7 +263,7 @@ fun PaywallModal(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                 }
 
                 // CTA Button & Restore Purchases
@@ -364,11 +370,11 @@ private fun ProFeatureRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top
     ) {
-        Text(text = icon, fontSize = 20.sp)
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(text = icon, fontSize = 18.sp)
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text(
                 text = title,
-                fontSize = 14.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = AnteroomColors.OnSurface
             )
@@ -376,7 +382,7 @@ private fun ProFeatureRow(
                 text = desc,
                 fontSize = 12.sp,
                 color = AnteroomColors.OnSurfaceSecondary,
-                lineHeight = 16.sp
+                lineHeight = 15.sp
             )
         }
     }
