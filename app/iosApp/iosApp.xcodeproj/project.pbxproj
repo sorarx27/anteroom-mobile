@@ -6,6 +6,14 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4730A276D7C0EBDD298210A0 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 77E637BA240A66D433940D54 /* FirebaseCore */; };
+		817D5DA2102791DB1AEF0705 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 71FCC04E7D567793C727711F /* FirebaseAuth */; };
+		789732988E4BAF308F8B48D9 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 80BC9DC2153EC9408EA51F78 /* FirebaseFirestore */; };
+		83E9A4625686C250E1EBC2CB /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = D91640BF3653072E83B2054F /* FirebaseStorage */; };
+		6FE1C9CB534C2A6C0AACD07F /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 3AC0C63DFC63B69347ECEAE8 /* FirebaseFunctions */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		E93B6D50C83B09F745A49BDA /* Anteroom.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Anteroom.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -41,6 +49,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4730A276D7C0EBDD298210A0 /* FirebaseCore in Frameworks */,
+				817D5DA2102791DB1AEF0705 /* FirebaseAuth in Frameworks */,
+				789732988E4BAF308F8B48D9 /* FirebaseFirestore in Frameworks */,
+				83E9A4625686C250E1EBC2CB /* FirebaseStorage in Frameworks */,
+				6FE1C9CB534C2A6C0AACD07F /* FirebaseFunctions in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -85,6 +98,11 @@
 			);
 			name = iosApp;
 			packageProductDependencies = (
+				77E637BA240A66D433940D54 /* FirebaseCore */,
+				71FCC04E7D567793C727711F /* FirebaseAuth */,
+				80BC9DC2153EC9408EA51F78 /* FirebaseFirestore */,
+				D91640BF3653072E83B2054F /* FirebaseStorage */,
+				3AC0C63DFC63B69347ECEAE8 /* FirebaseFunctions */,
 			);
 			productName = iosApp;
 			productReference = E93B6D50C83B09F745A49BDA /* Anteroom.app */;
@@ -115,6 +133,9 @@
 			mainGroup = 980B3A021B9BD7A89E350A10;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
+			packageReferences = (
+				6658E96F4AC239EDE72A6DA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			productRefGroup = 402053331238FBD123F46649 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -123,6 +144,45 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		6658E96F4AC239EDE72A6DA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.15.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		77E637BA240A66D433940D54 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6658E96F4AC239EDE72A6DA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		71FCC04E7D567793C727711F /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6658E96F4AC239EDE72A6DA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		80BC9DC2153EC9408EA51F78 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6658E96F4AC239EDE72A6DA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		D91640BF3653072E83B2054F /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6658E96F4AC239EDE72A6DA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+		3AC0C63DFC63B69347ECEAE8 /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6658E96F4AC239EDE72A6DA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin PBXResourcesBuildPhase section */
 		34F1D3BD2E7521279DEBE18F /* Resources */ = {

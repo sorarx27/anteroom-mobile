@@ -19,7 +19,8 @@ dependencies {
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
 
-    implementation("com.revenuecat.purchases:purchases:8.12.2")
+    // The native billing client arrives transitively via :app:shared -> purchases-kmp-core.
+    // Pinning it here as well pulled in a second, older major version.
 }
 
 android {

@@ -48,11 +48,24 @@ kotlin {
     }
 
     sourceSets {
+        // purchases-kmp publishes Android and Apple artifacts only, so the store-backed billing
+        // code is compiled into both mobile targets from one shared directory. An intermediate
+        // source set wired with dependsOn() would switch off the default hierarchy template that
+        // this module relies on for iosMain.
+        androidMain.get().kotlin.srcDir("src/mobileMain/kotlin")
+        iosMain.get().kotlin.srcDir("src/mobileMain/kotlin")
+
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
             implementation(project.dependencies.platform("com.google.firebase:firebase-bom:33.7.0"))
+            implementation(libs.purchases.core)
+            implementation(libs.purchases.result)
+        }
+        iosMain.dependencies {
+            implementation(libs.purchases.core)
+            implementation(libs.purchases.result)
         }
         commonMain.dependencies {
             api(project(":core"))

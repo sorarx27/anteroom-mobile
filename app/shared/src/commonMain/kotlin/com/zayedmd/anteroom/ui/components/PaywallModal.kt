@@ -20,8 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.zayedmd.anteroom.subscription.AnteroomPurchases
+import com.zayedmd.anteroom.subscription.RevenueCatConfig
 import com.zayedmd.anteroom.subscription.RevenueCatService
-import com.zayedmd.anteroom.subscription.RevenueCatServiceImpl
 import com.zayedmd.anteroom.subscription.SubscriptionPackage
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
 import kotlinx.coroutines.launch
@@ -31,26 +32,44 @@ fun PaywallModal(
     onDismiss: () -> Unit,
     onUpgradeSuccess: () -> Unit,
     triggerReason: String = "family-profiles",
-    revenueCatService: RevenueCatService = remember { RevenueCatServiceImpl() }
+    revenueCatService: RevenueCatService = AnteroomPurchases.service
 ) {
     val scope = rememberCoroutineScope()
     val offering by revenueCatService.activeOffering.collectAsState()
     val isProcessing by revenueCatService.isProcessing.collectAsState()
     val lastError by revenueCatService.lastError.collectAsState()
+    val isSubscribed by revenueCatService.isSubscribed.collectAsState()
+
+    // Prices are whatever RevenueCat says they are right now, in the shopper's own currency.
+    LaunchedEffect(Unit) {
+        revenueCatService.clearError()
+        revenueCatService.fetchOfferings()
+    }
+
+    // The entitlement can also turn on from outside this sheet - a restore on another device, a
+    // renewal, a promoted App Store purchase - so close on the state, not just on the tap.
+    LaunchedEffect(isSubscribed) {
+        if (isSubscribed) onUpgradeSuccess()
+    }
 
     val packages = remember(offering) {
-        offering?.availablePackages ?: listOf(
-            RevenueCatServiceImpl.SANDBOX_MONTHLY,
-            RevenueCatServiceImpl.SANDBOX_LIFETIME
+        offering?.availablePackages?.takeIf { it.isNotEmpty() } ?: listOf(
+            RevenueCatConfig.FALLBACK_MONTHLY,
+            RevenueCatConfig.FALLBACK_LIFETIME
         )
     }
 
     var selectedPkgId by remember(packages) {
-        mutableStateOf(packages.firstOrNull()?.identifier ?: RevenueCatServiceImpl.PACKAGE_MONTHLY)
+        mutableStateOf(packages.firstOrNull()?.identifier ?: RevenueCatConfig.PACKAGE_MONTHLY)
     }
 
     Dialog(
-        onDismissRequest = { if (!isProcessing) onDismiss() },
+        onDismissRequest = {
+            if (!isProcessing) {
+                revenueCatService.clearError()
+                onDismiss()
+            }
+        },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
@@ -78,7 +97,10 @@ fun PaywallModal(
                             .size(38.dp)
                             .clip(CircleShape)
                             .background(AnteroomColors.SurfaceSecondary)
-                            .clickable(enabled = !isProcessing) { onDismiss() },
+                            .clickable(enabled = !isProcessing) {
+                                revenueCatService.clearError()
+                                onDismiss()
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Text("✕", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AnteroomColors.OnSurface)
@@ -256,8 +278,11 @@ fun PaywallModal(
                             onClick = {
                                 if (selectedPackage != null && !isProcessing) {
                                     scope.launch {
-                                        val result = revenueCatService.purchasePackage(selectedPackage)
-                                        if (result.isSuccess) {
+                                        // Success means the anteroom_pro entitlement is actually
+                                        // active, not merely that the call returned.
+                                        if (revenueCatService.purchasePackage(selectedPackage)
+                                                .getOrDefault(false)
+                                        ) {
                                             onUpgradeSuccess()
                                         }
                                     }
@@ -288,14 +313,25 @@ fun PaywallModal(
                             }
                         }
 
+                        if (revenueCatService.isSimulated) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Sandbox simulation on this platform - no store charge.",
+                                fontSize = 11.sp,
+                                color = AnteroomColors.Muted,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
                         Spacer(modifier = Modifier.height(8.dp))
 
                         TextButton(
                             onClick = {
                                 if (!isProcessing) {
                                     scope.launch {
-                                        val result = revenueCatService.restorePurchases()
-                                        if (result.isSuccess) {
+                                        if (revenueCatService.restorePurchases()
+                                                .getOrDefault(false)
+                                        ) {
                                             onUpgradeSuccess()
                                         }
                                     }

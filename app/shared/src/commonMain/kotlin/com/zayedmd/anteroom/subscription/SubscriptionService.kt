@@ -9,8 +9,14 @@ interface SubscriptionManager {
     fun setSubscribed(subscribed: Boolean)
 }
 
+/**
+ * App-wide read model for `anteroom_pro`. Every paywall guard in the UI collects this flow, which
+ * is why exactly one writer is allowed: [RevenueCatService], after it has verified the entitlement
+ * against RevenueCat's customer info. Do not call [setSubscribed] from the UI
+ * - an optimistic unlock here would survive a failed or refunded purchase.
+ */
 object SubscriptionService : SubscriptionManager {
-    // Default to free tier for testing paywall guards
+    // Free tier until RevenueCat says otherwise.
     private val _isSubscribed = MutableStateFlow(false)
     override val isSubscribed: StateFlow<Boolean> = _isSubscribed.asStateFlow()
 

@@ -20,6 +20,7 @@ logback = "1.6.3"
 gitliveFirebase = "2.1.0"
 kmpauth = "2.0.0"
 material3 = "1.12.0-alpha03"
+purchases-kmp = "3.8.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -60,6 +61,9 @@ gitlive-firebase-auth = { module = "dev.gitlive:firebase-auth", version.ref = "g
 gitlive-firebase-firestore = { module = "dev.gitlive:firebase-firestore", version.ref = "gitliveFirebase" }
 gitlive-firebase-storage = { module = "dev.gitlive:firebase-storage", version.ref = "gitliveFirebase" }
 gitlive-firebase-functions = { module = "dev.gitlive:firebase-functions", version.ref = "gitliveFirebase" }
+purchases-core = { module = "com.revenuecat.purchases:purchases-kmp-core", version.ref = "purchases-kmp" }
+purchases-ui = { module = "com.revenuecat.purchases:purchases-kmp-ui", version.ref = "purchases-kmp" }
+purchases-result = { module = "com.revenuecat.purchases:purchases-kmp-result", version.ref = "purchases-kmp" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

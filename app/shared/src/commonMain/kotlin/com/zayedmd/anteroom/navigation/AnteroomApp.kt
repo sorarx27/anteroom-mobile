@@ -26,9 +26,10 @@ import com.zayedmd.anteroom.data.ProfilesRepositoryImpl
 import com.zayedmd.anteroom.media.CapturedPhoto
 import com.zayedmd.anteroom.model.Brief
 import com.zayedmd.anteroom.model.Profile
+import com.zayedmd.anteroom.subscription.AnteroomPurchases
 import com.zayedmd.anteroom.subscription.RevenueCatService
-import com.zayedmd.anteroom.subscription.RevenueCatServiceImpl
 import com.zayedmd.anteroom.subscription.SubscriptionService
+import com.zayedmd.anteroom.subscription.defaultRevenueCatApiKey
 import com.zayedmd.anteroom.ui.components.PaywallModal
 import com.zayedmd.anteroom.ui.screens.*
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
@@ -54,7 +55,7 @@ fun AnteroomApp(
     authService: AuthService = remember { AuthServiceImpl() },
     profilesRepository: ProfilesRepository = remember { ProfilesRepositoryImpl() },
     briefsRepository: BriefsRepository = remember { BriefsRepositoryImpl() },
-    revenueCatService: RevenueCatService = remember { RevenueCatServiceImpl() }
+    revenueCatService: RevenueCatService = AnteroomPurchases.service
 ) {
     val status by authService.status.collectAsState()
     val user by authService.user.collectAsState()
@@ -72,6 +73,14 @@ fun AnteroomApp(
     var activeBriefId by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
+
+    // Configure RevenueCat once, then re-key the purchase identity whenever the signed-in user
+    // changes so entitlements follow the Anteroom account rather than the device.
+    LaunchedEffect(user?.user_id) {
+        revenueCatService.initialize(defaultRevenueCatApiKey(), user?.user_id)
+        revenueCatService.refreshCustomerInfo()
+        revenueCatService.fetchOfferings()
+    }
 
     AnteroomTheme {
         when (status) {
@@ -330,7 +339,9 @@ fun AnteroomApp(
                             revenueCatService = revenueCatService,
                             onDismiss = { showPaywallModal = false },
                             onUpgradeSuccess = {
-                                SubscriptionService.setSubscribed(true)
+                                // RevenueCat is the source of truth here: the service already
+                                // pushed the verified anteroom_pro entitlement into
+                                // SubscriptionService, so the modal only has to get out of the way.
                                 showPaywallModal = false
                             }
                         )
