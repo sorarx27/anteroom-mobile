@@ -1,6 +1,8 @@
 package com.zayedmd.anteroom.auth
 
 import com.zayedmd.anteroom.model.AppUser
+import com.zayedmd.anteroom.data.ProfilesRepository
+import com.zayedmd.anteroom.data.ProfilesRepositoryImpl
 import com.zayedmd.anteroom.debug.DebugOptions
 import com.zayedmd.anteroom.firebase.FirebaseService
 import dev.gitlive.firebase.auth.FirebaseUser
@@ -12,7 +14,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class AuthServiceImpl(private val tokenStorage: TokenStorage = TokenStorage()) : AuthService {
+class AuthServiceImpl(
+    private val tokenStorage: TokenStorage = TokenStorage(),
+    private val profilesRepository: ProfilesRepository = ProfilesRepositoryImpl()
+) : AuthService {
     private val _user = MutableStateFlow<AppUser?>(null)
     override val user: StateFlow<AppUser?> = _user.asStateFlow()
 
@@ -80,8 +85,32 @@ class AuthServiceImpl(private val tokenStorage: TokenStorage = TokenStorage()) :
             FirebaseService.firestore.collection("users").document(firebaseUser.uid).set(newUser)
             newUser
         }
+        bootstrapSelfProfile(appUser)
         _user.value = appUser
         _status.value = AuthStatus.Authenticated
+    }
+
+    /**
+     * Creates `users/{uid}/profiles/self` if it isn't there yet.
+     *
+     * Every brief points at a profile, and the Firestore rule for creating one
+     * checks that the referenced profile document exists — so without this an
+     * account can sign in and then be unable to make a brief at all. The call
+     * is idempotent, so running it on every sign-in costs one read.
+     *
+     * A failure here does not revoke the session. This runs on the silent
+     * restore path as well as on an explicit sign-in, and logging someone out
+     * because a profile write timed out would be a worse bug than the one it
+     * guards against. `onSnapClick` calls the same method at the point where
+     * the profile is actually needed and can report the failure there.
+     */
+    private suspend fun bootstrapSelfProfile(appUser: AppUser) {
+        runCatching {
+            profilesRepository.ensureSelfProfile(
+                userId = appUser.user_id,
+                displayName = appUser.name ?: ""
+            )
+        }
     }
 
     override suspend fun signInEmail(email: String, password: String) {
@@ -100,6 +129,7 @@ class AuthServiceImpl(private val tokenStorage: TokenStorage = TokenStorage()) :
             provider = "email"
         )
         FirebaseService.firestore.collection("users").document(fbUser.uid).set(newUser)
+        bootstrapSelfProfile(newUser)
         _user.value = newUser
         _status.value = AuthStatus.Authenticated
     }

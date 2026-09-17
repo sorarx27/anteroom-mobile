@@ -4,5 +4,14 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<!-- Required. Presenting UIImagePickerController with the camera source
+	     without this key terminates the app with SIGABRT before anything is
+	     drawn. The gallery path uses PHPickerViewController, which runs out of
+	     process and needs no library permission, but the description is kept
+	     for the UIImagePickerController fallback. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Anteroom uses the camera to photograph your medical paperwork so it can be turned into a brief. Photos stay in your account.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Anteroom needs access to your photos so you can add existing pictures of referrals, medication lists, and lab results to a brief.</string>
 </dict>
 </plist>

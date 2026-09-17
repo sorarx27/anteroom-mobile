@@ -24,6 +24,27 @@ service cloud.firestore {
       ];
     }
 
+    // At create time the same fields are checked by VALUE, not by absence.
+    // Two reasons the key-absence test used for updates cannot work here:
+    // `status` has to be present and equal to 'draft', and the Kotlin client
+    // serialises the whole data class, so every nullable field arrives as an
+    // explicit null. Requiring the keys to be missing rejected every brief
+    // the app could actually create.
+    function briefServerFieldsUnset() {
+      let d = request.resource.data;
+      return d.get('content', null) == null
+        && d.get('content_translations', null) == null
+        && d.get('generated_at', null) == null
+        && d.get('share_token', null) == null
+        && d.get('share_expires_at', null) == null
+        && d.get('share_url_path', null) == null
+        && d.get('source_language', null) == null
+        && d.get('available_languages', []).size() == 0
+        && d.get('detected_doc_type', null) == null
+        && d.get('detected_confidence', null) == null
+        && d.get('last_error', null) == null;
+    }
+
     function docTypes() {
       return ['referral', 'med_list', 'lab_result', 'other'];
     }
@@ -103,7 +124,7 @@ service cloud.firestore {
         && request.resource.data.photos.size() == 0
         && request.resource.data.profile_id is string
         && exists(/databases/$(database)/documents/users/$(uid())/profiles/$(request.resource.data.profile_id))
-        && !request.resource.data.keys().hasAny(briefServerFields());
+        && briefServerFieldsUnset();
 
       allow update: if signedIn()
         && resource.data.user_id == uid()

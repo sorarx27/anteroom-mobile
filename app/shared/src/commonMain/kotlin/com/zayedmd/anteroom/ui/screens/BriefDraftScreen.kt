@@ -20,8 +20,9 @@ import androidx.compose.ui.unit.sp
 import com.zayedmd.anteroom.data.BriefsRepository
 import com.zayedmd.anteroom.model.*
 import com.zayedmd.anteroom.ui.components.*
+import com.zayedmd.anteroom.ui.launchSafely
+import com.zayedmd.anteroom.ui.runSafely
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
-import kotlinx.coroutines.launch
 
 @Composable
 fun BriefDraftScreen(
@@ -47,16 +48,24 @@ fun BriefDraftScreen(
 
     // Load initial brief data
     LaunchedEffect(briefId) {
-        val loaded = briefsRepository.getBrief(briefId)
-        if (loaded != null) {
-            brief = loaded
-            selectedDocType = loaded.doc_type
-            if (loaded.detected_doc_type == null && loaded.photos.isNotEmpty()) {
-                isDetecting = true
-                val detected = briefsRepository.detectDocType(briefId)
-                brief = briefsRepository.getBrief(briefId)
-                selectedDocType = detected
-                isDetecting = false
+        runSafely {
+            val loaded = briefsRepository.getBrief(briefId)
+            if (loaded != null) {
+                brief = loaded
+                selectedDocType = loaded.doc_type
+                if (loaded.detected_doc_type == null && loaded.photos.isNotEmpty()) {
+                    isDetecting = true
+                    // try/finally, not a trailing assignment: classification is
+                    // a network call, and if it throws the spinner stays up
+                    // forever over a screen recording with no way to dismiss it.
+                    try {
+                        val detected = briefsRepository.detectDocType(briefId)
+                        brief = briefsRepository.getBrief(briefId)
+                        selectedDocType = detected
+                    } finally {
+                        isDetecting = false
+                    }
+                }
             }
         }
     }
@@ -138,7 +147,7 @@ fun BriefDraftScreen(
                     selectedDocType = selectedDocType,
                     onSelectDocType = { newType ->
                         selectedDocType = newType
-                        scope.launch {
+                        scope.launchSafely {
                             briefsRepository.updateBriefDocType(briefId, newType)
                         }
                     },
@@ -146,12 +155,15 @@ fun BriefDraftScreen(
                     confidence = currentBrief?.detected_confidence,
                     isDetecting = isDetecting,
                     onRedetectClick = {
-                        scope.launch {
+                        scope.launchSafely {
                             isDetecting = true
-                            val detected = briefsRepository.detectDocType(briefId)
-                            brief = briefsRepository.getBrief(briefId)
-                            selectedDocType = detected
-                            isDetecting = false
+                            try {
+                                val detected = briefsRepository.detectDocType(briefId)
+                                brief = briefsRepository.getBrief(briefId)
+                                selectedDocType = detected
+                            } finally {
+                                isDetecting = false
+                            }
                         }
                     },
                     hasPhotos = photos.isNotEmpty()
@@ -175,10 +187,13 @@ fun BriefDraftScreen(
                     photos = photos,
                     onAddMoreClick = onAddMorePhotos,
                     onDeletePhotoClick = { photoId ->
-                        scope.launch {
+                        scope.launchSafely {
                             deletingPhotoId = photoId
-                            brief = briefsRepository.removePhotoFromBrief(briefId, photoId)
-                            deletingPhotoId = null
+                            try {
+                                brief = briefsRepository.removePhotoFromBrief(briefId, photoId)
+                            } finally {
+                                deletingPhotoId = null
+                            }
                         }
                     },
                     onPhotoClick = { photo, pageIndex ->
@@ -205,10 +220,16 @@ fun BriefDraftScreen(
 
                     Button(
                         onClick = {
-                            scope.launch {
+                            scope.launchSafely {
                                 isGenerating = true
-                                val generated = briefsRepository.generateBrief(briefId, selectedLanguage)
-                                isGenerating = false
+                                // The generation modal is driven by isGenerating.
+                                // Without finally, a failed extraction leaves an
+                                // undismissable dialog covering the whole app.
+                                val generated = try {
+                                    briefsRepository.generateBrief(briefId, selectedLanguage)
+                                } finally {
+                                    isGenerating = false
+                                }
                                 onBriefGenerated(generated)
                             }
                         },
@@ -249,7 +270,7 @@ fun BriefDraftScreen(
                 totalPages = photos.size,
                 onDismiss = { inspectingPhoto = null },
                 onDelete = {
-                    scope.launch {
+                    scope.launchSafely {
                         brief = briefsRepository.removePhotoFromBrief(briefId, photo.photo_id)
                         inspectingPhoto = null
                     }
@@ -287,7 +308,7 @@ fun BriefDraftScreen(
                     Button(
                         onClick = {
                             showDiscardConfirmDialog = false
-                            scope.launch {
+                            scope.launchSafely {
                                 briefsRepository.deleteBrief(briefId)
                                 onDiscardDraft()
                             }

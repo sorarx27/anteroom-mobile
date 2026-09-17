@@ -116,7 +116,7 @@ class BriefsRepositoryImpl : BriefsRepository {
             doc_type_manual_override = true,
             updated_at = nowIso()
         )
-        briefs.document(briefId).set(updated)
+        briefs.document(briefId).set(updated, *DOC_TYPE_FIELDS)
         return updated
     }
 
@@ -126,7 +126,7 @@ class BriefsRepositoryImpl : BriefsRepository {
             photos = existing.photos + photo,
             updated_at = nowIso()
         )
-        briefs.document(briefId).set(updated)
+        briefs.document(briefId).set(updated, *PHOTO_FIELDS)
         return updated
     }
 
@@ -136,7 +136,7 @@ class BriefsRepositoryImpl : BriefsRepository {
             photos = existing.photos.filter { it.photo_id != photoId },
             updated_at = nowIso()
         )
-        briefs.document(briefId).set(updated)
+        briefs.document(briefId).set(updated, *PHOTO_FIELDS)
         return updated
     }
 
@@ -178,5 +178,21 @@ class BriefsRepositoryImpl : BriefsRepository {
         )
         return getBrief(briefId)
             ?: throw IllegalStateException("Brief disappeared during translation")
+    }
+
+    private companion object {
+        /**
+         * Field lists for merge writes.
+         *
+         * Every mutation here is a merge rather than a whole-document `set`.
+         * A full set re-serialises fields the client only ever read — most of
+         * all `content`, which a Cloud Function wrote — and the update rule
+         * rejects any write whose diff touches a server-owned key. Round-trips
+         * through the Kotlin model are not guaranteed to be byte-identical
+         * (a field Python writes but the model lacks would silently vanish on
+         * the way back), so the safe thing is never to send them at all.
+         */
+        val DOC_TYPE_FIELDS = arrayOf("doc_type", "doc_type_manual_override", "updated_at")
+        val PHOTO_FIELDS = arrayOf("photos", "updated_at")
     }
 }

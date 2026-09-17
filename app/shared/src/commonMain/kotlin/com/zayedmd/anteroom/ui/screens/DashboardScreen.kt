@@ -28,6 +28,7 @@ import com.zayedmd.anteroom.ui.components.FamilyProfileStrip
 import com.zayedmd.anteroom.ui.components.ProFeatureTeaserRow
 import com.zayedmd.anteroom.ui.components.SnapPaperworkBottomBar
 import com.zayedmd.anteroom.ui.components.UpgradeBanner
+import com.zayedmd.anteroom.ui.runSafely
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
 import kotlinx.coroutines.launch
 
@@ -53,17 +54,24 @@ fun DashboardScreen(
     // Load profiles once
     LaunchedEffect(user.user_id) {
         isLoading = true
-        val list = profilesRepository.getProfiles(user.user_id)
-        profiles = list
-        val defaultId = list.find { it.is_self }?.profile_id ?: list.firstOrNull()?.profile_id
-        activeProfileId = defaultId
-        isLoading = false
+        // finally, so a failed profile read leaves an empty dashboard the user
+        // can retry from rather than a spinner that never stops.
+        try {
+            runSafely {
+                val list = profilesRepository.getProfiles(user.user_id)
+                profiles = list
+                activeProfileId =
+                    list.find { it.is_self }?.profile_id ?: list.firstOrNull()?.profile_id
+            }
+        } finally {
+            isLoading = false
+        }
     }
 
     // Load briefs whenever the active profile changes
     LaunchedEffect(activeProfileId) {
         if (activeProfileId != null) {
-            briefs = briefsRepository.getBriefs(activeProfileId)
+            runSafely { briefs = briefsRepository.getBriefs(activeProfileId) }
         }
     }
 

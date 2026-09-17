@@ -31,7 +31,10 @@ import com.zayedmd.anteroom.subscription.AnteroomPurchases
 import com.zayedmd.anteroom.subscription.RevenueCatService
 import com.zayedmd.anteroom.subscription.SubscriptionService
 import com.zayedmd.anteroom.subscription.defaultRevenueCatApiKey
+import com.zayedmd.anteroom.ui.AnteroomErrors
 import com.zayedmd.anteroom.ui.ConfigureImageLoading
+import com.zayedmd.anteroom.ui.launchSafely
+import com.zayedmd.anteroom.ui.components.ErrorBanner
 import com.zayedmd.anteroom.ui.components.PaywallModal
 import com.zayedmd.anteroom.ui.screens.*
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
@@ -99,280 +102,300 @@ fun AnteroomApp(
     }
 
     AnteroomTheme {
-        when (status) {
-            AuthStatus.Loading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(AnteroomColors.SurfaceInverse),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "ANTEROOM",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 4.sp
-                        )
-                        CircularProgressIndicator(
-                            color = AnteroomColors.Brand,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                }
-            }
+        val errorMessage by AnteroomErrors.message.collectAsState()
 
-            AuthStatus.Unauthenticated -> {
-                AnimatedContent(
-                    targetState = onboardingDestination,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() }
-                ) { destination ->
-                    when (destination) {
-                        is OnboardingDestination.Welcome -> {
-                            WelcomeScreen(
-                                onGetStarted = {
-                                    onboardingDestination = OnboardingDestination.Onboarding
-                                },
-                                onSignIn = {
-                                    onboardingDestination = OnboardingDestination.Auth(AuthMode.SignIn)
-                                }
-                            )
-                        }
-                        is OnboardingDestination.Onboarding -> {
-                            OnboardingScreen(
-                                onBack = {
-                                    onboardingDestination = OnboardingDestination.Welcome
-                                },
-                                onCreateAccount = {
-                                    onboardingDestination = OnboardingDestination.Auth(AuthMode.SignUp)
-                                },
-                                onSignIn = {
-                                    onboardingDestination = OnboardingDestination.Auth(AuthMode.SignIn)
-                                }
-                            )
-                        }
-                        is OnboardingDestination.Auth -> {
-                            AuthScreen(
-                                initialMode = destination.mode,
-                                onBack = {
-                                    onboardingDestination = OnboardingDestination.Welcome
-                                },
-                                authService = authService
-                            )
-                        }
-                    }
-                }
-            }
-
-            AuthStatus.Authenticated -> {
-                val currentUser = user
-                if (currentUser != null && !currentUser.profile_completed) {
-                    ProfileSetupScreen(
-                        user = currentUser,
-                        authService = authService
-                    )
-                } else if (currentUser != null) {
-                    when (val screen = currentScreen) {
-                        is AppScreen.Dashboard -> {
-                            DashboardScreen(
-                                user = currentUser,
-                                authService = authService,
-                                profilesRepository = profilesRepository,
-                                briefsRepository = briefsRepository,
-                                isSubscribed = isSubscribed,
-                                onUpgradeClick = {
-                                    paywallTrigger = "general"
-                                    showPaywallModal = true
-                                },
-                                onAddProfileClick = {
-                                    if (!isSubscribed) {
-                                        paywallTrigger = "family-profiles"
-                                        showPaywallModal = true
-                                    } else {
-                                        currentScreen = AppScreen.ProfileAddEdit(null)
-                                    }
-                                },
-                                onEditProfileClick = { profileToEdit ->
-                                    currentScreen = AppScreen.ProfileAddEdit(profileToEdit)
-                                },
-                                onSnapClick = {
-                                    scope.launch {
-                                        val profiles = profilesRepository.getProfiles(currentUser.user_id)
-                                        val active = profiles.find { it.is_self } ?: profiles.firstOrNull()
-                                        val draft = briefsRepository.createBrief(
-                                            userId = currentUser.user_id,
-                                            profileId = active?.profile_id ?: "default"
-                                        )
-                                        activeBriefId = draft.brief_id
-                                        activeDraftPhotos = emptyList()
-                                        currentScreen = AppScreen.Capture(active, draft.brief_id)
-                                    }
-                                },
-                                onBriefClick = { brief ->
-                                    if (brief.status == com.zayedmd.anteroom.model.BriefStatus.draft) {
-                                        activeBriefId = brief.brief_id
-                                        currentScreen = AppScreen.BriefDraft(brief.brief_id)
-                                    } else {
-                                        currentScreen = AppScreen.BriefView(brief.brief_id)
-                                    }
-                                }
-                            )
-                        }
-
-                        is AppScreen.Capture -> {
-                            CaptureScreen(
-                                activeProfile = screen.profile,
-                                briefId = screen.existingBriefId ?: activeBriefId,
-                                photos = activeDraftPhotos,
-                                uploadingCount = uploadingCount,
-                                errorMessage = uploadError,
-                                onPhotosCaptured = { newPhotos ->
-                                    activeDraftPhotos = activeDraftPhotos + newPhotos
-                                    val targetBriefId = screen.existingBriefId ?: activeBriefId
-                                    if (targetBriefId != null) {
-                                        scope.launch {
-                                            photoUploadService.uploadPhotos(targetBriefId, newPhotos)
-                                        }
-                                    }
-                                },
-                                onCancel = {
-                                    photoUploadService.clearError()
-                                    currentScreen = AppScreen.Dashboard
-                                },
-                                onReviewClick = {
-                                    val targetBriefId = screen.existingBriefId ?: activeBriefId
-                                    if (targetBriefId != null) {
-                                        currentScreen = AppScreen.BriefDraft(targetBriefId)
-                                    } else {
-                                        currentScreen = AppScreen.Dashboard
-                                    }
-                                }
-                            )
-                        }
-
-                        is AppScreen.BriefDraft -> {
-                            BriefDraftScreen(
-                                briefId = screen.briefId,
-                                briefsRepository = briefsRepository,
-                                isSubscribed = isSubscribed,
-                                onBack = {
-                                    currentScreen = AppScreen.Dashboard
-                                },
-                                onAddMorePhotos = {
-                                    currentScreen = AppScreen.Capture(null, screen.briefId)
-                                },
-                                onBriefGenerated = { completedBrief ->
-                                    currentScreen = AppScreen.BriefView(completedBrief.brief_id)
-                                },
-                                onDiscardDraft = {
-                                    currentScreen = AppScreen.Dashboard
-                                },
-                                onUpgradeRequired = {
-                                    paywallTrigger = "translate"
-                                    showPaywallModal = true
-                                }
-                            )
-                        }
-
-                        is AppScreen.BriefView -> {
-                            BriefViewScreen(
-                                briefId = screen.briefId,
-                                briefsRepository = briefsRepository,
-                                isSubscribed = isSubscribed,
-                                onBack = {
-                                    currentScreen = AppScreen.Dashboard
-                                },
-                                onEditDraft = {
-                                    currentScreen = AppScreen.BriefDraft(screen.briefId)
-                                },
-                                onUpgradeRequired = {
-                                    paywallTrigger = "brief-view"
-                                    showPaywallModal = true
-                                },
-                                onOpenShareLink = { fullUrl ->
-                                    // Fallback/log URL or open in browser
-                                },
-                                onDownloadPdf = {
-                                    if (!isSubscribed) {
-                                        paywallTrigger = "clean-export"
-                                        showPaywallModal = true
-                                    }
-                                }
-                            )
-                        }
-
-                        is AppScreen.ProfileAddEdit -> {
-                            ProfileAddEditScreen(
-                                editingProfile = screen.profile,
-                                isSubscribed = isSubscribed,
-                                onBack = {
-                                    currentScreen = AppScreen.Dashboard
-                                },
-                                onSaveProfile = { name, relationship, dob, sex ->
-                                    scope.launch {
-                                        if (screen.profile != null) {
-                                            profilesRepository.updateProfile(
-                                                profileId = screen.profile.profile_id,
-                                                name = name,
-                                                relationship = relationship,
-                                                dob = dob,
-                                                sex = sex
-                                            )
-                                        } else {
-                                            profilesRepository.createProfile(
-                                                userId = currentUser.user_id,
-                                                name = name,
-                                                relationship = relationship,
-                                                dob = dob,
-                                                sex = sex
-                                            )
-                                        }
-                                        currentScreen = AppScreen.Dashboard
-                                    }
-                                },
-                                onDeleteProfile = { profileIdToDelete ->
-                                    scope.launch {
-                                        profilesRepository.deleteProfile(profileIdToDelete)
-                                        currentScreen = AppScreen.Dashboard
-                                    }
-                                },
-                                onUpgradeRequired = {
-                                    paywallTrigger = "family-profiles"
-                                    showPaywallModal = true
-                                }
-                            )
-                        }
-                    }
-
-                    if (showPaywallModal) {
-                        PaywallModal(
-                            triggerReason = paywallTrigger,
-                            revenueCatService = revenueCatService,
-                            onDismiss = { showPaywallModal = false },
-                            onUpgradeSuccess = {
-                                // RevenueCat is the source of truth here: the service already
-                                // pushed the verified anteroom_pro entitlement into
-                                // SubscriptionService, so the modal only has to get out of the way.
-                                showPaywallModal = false
-                            }
-                        )
-                    }
-                } else {
+        // Overlaid on everything rather than added screen by screen. The
+        // repositories no longer fall back to mock data, so any screen can
+        // now surface a real failure and all of them need somewhere to put it.
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (status) {
+                AuthStatus.Loading -> {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(AnteroomColors.Surface),
+                            .background(AnteroomColors.SurfaceInverse),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = AnteroomColors.BrandPrimary)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "ANTEROOM",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 4.sp
+                            )
+                            CircularProgressIndicator(
+                                color = AnteroomColors.Brand,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                }
+
+                AuthStatus.Unauthenticated -> {
+                    AnimatedContent(
+                        targetState = onboardingDestination,
+                        transitionSpec = { fadeIn() togetherWith fadeOut() }
+                    ) { destination ->
+                        when (destination) {
+                            is OnboardingDestination.Welcome -> {
+                                WelcomeScreen(
+                                    onGetStarted = {
+                                        onboardingDestination = OnboardingDestination.Onboarding
+                                    },
+                                    onSignIn = {
+                                        onboardingDestination = OnboardingDestination.Auth(AuthMode.SignIn)
+                                    }
+                                )
+                            }
+                            is OnboardingDestination.Onboarding -> {
+                                OnboardingScreen(
+                                    onBack = {
+                                        onboardingDestination = OnboardingDestination.Welcome
+                                    },
+                                    onCreateAccount = {
+                                        onboardingDestination = OnboardingDestination.Auth(AuthMode.SignUp)
+                                    },
+                                    onSignIn = {
+                                        onboardingDestination = OnboardingDestination.Auth(AuthMode.SignIn)
+                                    }
+                                )
+                            }
+                            is OnboardingDestination.Auth -> {
+                                AuthScreen(
+                                    initialMode = destination.mode,
+                                    onBack = {
+                                        onboardingDestination = OnboardingDestination.Welcome
+                                    },
+                                    authService = authService
+                                )
+                            }
+                        }
+                    }
+                }
+
+                AuthStatus.Authenticated -> {
+                    val currentUser = user
+                    if (currentUser != null && !currentUser.profile_completed) {
+                        ProfileSetupScreen(
+                            user = currentUser,
+                            authService = authService
+                        )
+                    } else if (currentUser != null) {
+                        when (val screen = currentScreen) {
+                            is AppScreen.Dashboard -> {
+                                DashboardScreen(
+                                    user = currentUser,
+                                    authService = authService,
+                                    profilesRepository = profilesRepository,
+                                    briefsRepository = briefsRepository,
+                                    isSubscribed = isSubscribed,
+                                    onUpgradeClick = {
+                                        paywallTrigger = "general"
+                                        showPaywallModal = true
+                                    },
+                                    onAddProfileClick = {
+                                        if (!isSubscribed) {
+                                            paywallTrigger = "family-profiles"
+                                            showPaywallModal = true
+                                        } else {
+                                            currentScreen = AppScreen.ProfileAddEdit(null)
+                                        }
+                                    },
+                                    onEditProfileClick = { profileToEdit ->
+                                        currentScreen = AppScreen.ProfileAddEdit(profileToEdit)
+                                    },
+                                    onSnapClick = {
+                                        scope.launchSafely {
+                                            // ensureSelfProfile rather than a lookup with a
+                                            // "default" fallback: the Firestore rule for creating
+                                            // a brief checks the referenced profile document
+                                            // actually exists, so an invented id was a guaranteed
+                                            // PERMISSION_DENIED. Idempotent, so this costs one read.
+                                            val active = profilesRepository.ensureSelfProfile(
+                                                userId = currentUser.user_id,
+                                                displayName = currentUser.name ?: ""
+                                            )
+                                            val draft = briefsRepository.createBrief(
+                                                userId = currentUser.user_id,
+                                                profileId = active.profile_id
+                                            )
+                                            activeBriefId = draft.brief_id
+                                            activeDraftPhotos = emptyList()
+                                            currentScreen = AppScreen.Capture(active, draft.brief_id)
+                                        }
+                                    },
+                                    onBriefClick = { brief ->
+                                        if (brief.status == com.zayedmd.anteroom.model.BriefStatus.draft) {
+                                            activeBriefId = brief.brief_id
+                                            currentScreen = AppScreen.BriefDraft(brief.brief_id)
+                                        } else {
+                                            currentScreen = AppScreen.BriefView(brief.brief_id)
+                                        }
+                                    }
+                                )
+                            }
+
+                            is AppScreen.Capture -> {
+                                CaptureScreen(
+                                    activeProfile = screen.profile,
+                                    briefId = screen.existingBriefId ?: activeBriefId,
+                                    photos = activeDraftPhotos,
+                                    uploadingCount = uploadingCount,
+                                    errorMessage = uploadError,
+                                    onPhotosCaptured = { newPhotos ->
+                                        activeDraftPhotos = activeDraftPhotos + newPhotos
+                                        val targetBriefId = screen.existingBriefId ?: activeBriefId
+                                        if (targetBriefId != null) {
+                                            scope.launchSafely {
+                                                photoUploadService.uploadPhotos(targetBriefId, newPhotos)
+                                            }
+                                        }
+                                    },
+                                    onCancel = {
+                                        photoUploadService.clearError()
+                                        currentScreen = AppScreen.Dashboard
+                                    },
+                                    onReviewClick = {
+                                        val targetBriefId = screen.existingBriefId ?: activeBriefId
+                                        if (targetBriefId != null) {
+                                            currentScreen = AppScreen.BriefDraft(targetBriefId)
+                                        } else {
+                                            currentScreen = AppScreen.Dashboard
+                                        }
+                                    }
+                                )
+                            }
+
+                            is AppScreen.BriefDraft -> {
+                                BriefDraftScreen(
+                                    briefId = screen.briefId,
+                                    briefsRepository = briefsRepository,
+                                    isSubscribed = isSubscribed,
+                                    onBack = {
+                                        currentScreen = AppScreen.Dashboard
+                                    },
+                                    onAddMorePhotos = {
+                                        currentScreen = AppScreen.Capture(null, screen.briefId)
+                                    },
+                                    onBriefGenerated = { completedBrief ->
+                                        currentScreen = AppScreen.BriefView(completedBrief.brief_id)
+                                    },
+                                    onDiscardDraft = {
+                                        currentScreen = AppScreen.Dashboard
+                                    },
+                                    onUpgradeRequired = {
+                                        paywallTrigger = "translate"
+                                        showPaywallModal = true
+                                    }
+                                )
+                            }
+
+                            is AppScreen.BriefView -> {
+                                BriefViewScreen(
+                                    briefId = screen.briefId,
+                                    briefsRepository = briefsRepository,
+                                    isSubscribed = isSubscribed,
+                                    onBack = {
+                                        currentScreen = AppScreen.Dashboard
+                                    },
+                                    onEditDraft = {
+                                        currentScreen = AppScreen.BriefDraft(screen.briefId)
+                                    },
+                                    onUpgradeRequired = {
+                                        paywallTrigger = "brief-view"
+                                        showPaywallModal = true
+                                    },
+                                    onOpenShareLink = { fullUrl ->
+                                        // Fallback/log URL or open in browser
+                                    },
+                                    onDownloadPdf = {
+                                        if (!isSubscribed) {
+                                            paywallTrigger = "clean-export"
+                                            showPaywallModal = true
+                                        }
+                                    }
+                                )
+                            }
+
+                            is AppScreen.ProfileAddEdit -> {
+                                ProfileAddEditScreen(
+                                    editingProfile = screen.profile,
+                                    isSubscribed = isSubscribed,
+                                    onBack = {
+                                        currentScreen = AppScreen.Dashboard
+                                    },
+                                    onSaveProfile = { name, relationship, dob, sex ->
+                                        scope.launchSafely {
+                                            if (screen.profile != null) {
+                                                profilesRepository.updateProfile(
+                                                    profileId = screen.profile.profile_id,
+                                                    name = name,
+                                                    relationship = relationship,
+                                                    dob = dob,
+                                                    sex = sex
+                                                )
+                                            } else {
+                                                profilesRepository.createProfile(
+                                                    userId = currentUser.user_id,
+                                                    name = name,
+                                                    relationship = relationship,
+                                                    dob = dob,
+                                                    sex = sex
+                                                )
+                                            }
+                                            currentScreen = AppScreen.Dashboard
+                                        }
+                                    },
+                                    onDeleteProfile = { profileIdToDelete ->
+                                        scope.launchSafely {
+                                            profilesRepository.deleteProfile(profileIdToDelete)
+                                            currentScreen = AppScreen.Dashboard
+                                        }
+                                    },
+                                    onUpgradeRequired = {
+                                        paywallTrigger = "family-profiles"
+                                        showPaywallModal = true
+                                    }
+                                )
+                            }
+                        }
+
+                        if (showPaywallModal) {
+                            PaywallModal(
+                                triggerReason = paywallTrigger,
+                                revenueCatService = revenueCatService,
+                                onDismiss = { showPaywallModal = false },
+                                onUpgradeSuccess = {
+                                    // RevenueCat is the source of truth here: the service already
+                                    // pushed the verified anteroom_pro entitlement into
+                                    // SubscriptionService, so the modal only has to get out of the way.
+                                    showPaywallModal = false
+                                }
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(AnteroomColors.Surface),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = AnteroomColors.BrandPrimary)
+                        }
                     }
                 }
             }
+
+            ErrorBanner(
+                message = errorMessage,
+                onDismiss = AnteroomErrors::clear,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
 }

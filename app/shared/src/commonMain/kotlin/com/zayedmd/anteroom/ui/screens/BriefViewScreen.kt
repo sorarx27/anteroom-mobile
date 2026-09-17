@@ -20,7 +20,9 @@ import androidx.compose.ui.unit.sp
 import com.zayedmd.anteroom.data.BriefsRepository
 import com.zayedmd.anteroom.model.*
 import com.zayedmd.anteroom.ui.components.*
+import com.zayedmd.anteroom.ui.runSafely
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
+import com.zayedmd.anteroom.ui.userMessage
 import kotlinx.coroutines.launch
 
 @Composable
@@ -43,7 +45,7 @@ fun BriefViewScreen(
     var inspectingPhoto by remember { mutableStateOf<Pair<BriefPhoto, Int>?>(null) }
 
     LaunchedEffect(briefId) {
-        brief = briefsRepository.getBrief(briefId)
+        runSafely { brief = briefsRepository.getBrief(briefId) }
     }
 
     val currentBrief = brief
@@ -183,7 +185,7 @@ fun BriefViewScreen(
                                 brief = updated
                                 activeLang = targetLang
                             } catch (e: Exception) {
-                                translateError = e.message ?: "Could not translate brief"
+                                translateError = e.userMessage()
                             } finally {
                                 isTranslating = false
                             }
