@@ -1,0 +1,7 @@
+firebase-functions>=0.4.2
+firebase-admin>=6.5.0
+google-genai>=2.23.0
+reportlab==5.0.1
+qrcode==8.2
+pillow>=11.0.0
+requests>=2.32.0

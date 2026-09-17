@@ -93,6 +93,8 @@ kotlin {
             implementation(libs.gitlive.firebase.firestore)
             implementation(libs.gitlive.firebase.storage)
             implementation(libs.gitlive.firebase.functions)
+            implementation(libs.kotlinx.datetime)
+            implementation(libs.coil.compose)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

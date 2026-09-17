@@ -20,3 +20,8 @@ node_modules/
 emergent-build/
 kotlin-js-store/
 sample-native-app/
+
+# Firebase Cloud Functions local Python environment
+functions/venv/
+functions/__pycache__/
+functions/**/__pycache__/
