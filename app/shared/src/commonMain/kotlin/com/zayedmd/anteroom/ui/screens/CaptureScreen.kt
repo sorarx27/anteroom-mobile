@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zayedmd.anteroom.media.CapturedPhoto
+import com.zayedmd.anteroom.ui.components.CaptureThumbnailStrip
 import com.zayedmd.anteroom.media.PermissionResult
 import com.zayedmd.anteroom.media.PermissionType
 import com.zayedmd.anteroom.media.rememberMediaPicker
@@ -151,6 +152,8 @@ fun CaptureScreen(
                     )
                 }
             }
+
+            CaptureThumbnailStrip(photos = photos)
 
             // Uploading progress row
             AnimatedVisibility(
