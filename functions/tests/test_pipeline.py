@@ -73,6 +73,41 @@ check("translation DOES render reaction", m["allergies"][0]["reaction"] == "erup
 check("translation DOES render flags", m["flagged_items"][0].startswith("Dosis"))
 check("translation DOES render referral_reason", m["referral_reason"].startswith("Opresion"))
 
+# --- frequency localisation: a lookup, never the model ---
+from anteroom.vertex import localize_frequency as L
+
+for src, want in [
+    ("once daily", "1 vez al día (c/24h)"), ("Once Daily", "1 vez al día (c/24h)"),
+    ("daily", "1 vez al día (c/24h)"), ("OD", "1 vez al día (c/24h)"),
+    ("q24h", "1 vez al día (c/24h)"), ("every 24 hours", "1 vez al día (c/24h)"),
+    ("twice daily", "cada 12h"), ("bid", "cada 12h"), ("BD", "cada 12h"),
+    ("three times daily", "cada 8h"), ("TDS", "cada 8h"), ("q8h", "cada 8h"),
+    ("four times daily", "cada 6h"), ("qds", "cada 6h"),
+    ("at night", "por la noche"), ("nocte", "por la noche"),
+    ("every morning", "por la mañana"), ("mane", "por la mañana"),
+    ("as directed", "según pauta"),
+]:
+    check(f"frequency {src!r} -> Spanish", L(src, "es") == want, repr(L(src, "es")))
+
+# Unrecognised input must survive untouched. An English frequency in a Spanish
+# brief is a cosmetic miss; a confidently wrong one is a clinical incident.
+for src in ("2 tablets twice daily", "every other day", "on alternate days", "PRN", ""):
+    check(f"frequency {src!r} passes through", L(src, "es") == src, repr(L(src, "es")))
+
+check("frequency untouched for English target", L("once daily", "en") == "once daily")
+check("frequency untouched for unknown target", L("once daily", "de") == "once daily")
+
+# And it must reach the merged output without disturbing name or dose.
+es = vertex.merge_translation(source, hostile, "es")
+check("merged: drug name still untranslated", es["medications"][0]["name"] == "Bisoprolol")
+check("merged: dose still verbatim", es["medications"][0]["dose"] == "2.5 mg")
+check("merged: frequency localised", es["medications"][0]["frequency"] == "1 vez al día (c/24h)",
+      es["medications"][0]["frequency"])
+
+en = vertex.merge_translation(source, hostile, "en")
+check("merged: English target leaves frequency alone",
+      en["medications"][0]["frequency"] == "once daily", en["medications"][0]["frequency"])
+
 # --- PDF ---
 free = render_brief_pdf(source, generated_at="2026-09-18", watermarked=True, brief_id="abc123", language="en")
 pro  = render_brief_pdf(source, generated_at="2026-09-18", watermarked=False, brief_id="abc123", language="en")

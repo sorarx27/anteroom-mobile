@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 from google import genai
@@ -245,12 +246,66 @@ def translate_content(content: dict, target: str) -> dict:
             response_schema=BRIEF_CONTENT_SCHEMA,
         ),
     )
-    return merge_translation(content, _parse(response))
+    return merge_translation(content, _parse(response), target)
 
 
 # ---------------------------------------------------------------------------
 # Shaping
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Frequency localisation
+# ---------------------------------------------------------------------------
+# Dosing frequency is the one part of a medication row a Spanish clinician
+# genuinely needs in Spanish -- "once daily" on a Spanish prescription summary
+# reads as untranslated, not as precision. But it is also a dosing
+# instruction, so a model must never be the thing that rewrites it: a single
+# "twice" -> "tres veces" slip is a dosing error with the app's name on it.
+#
+# So this is a lookup, not a translation. Whole-string exact matches only, no
+# partial substitution, and anything unrecognised is returned **unchanged**.
+# An English frequency surviving into a Spanish brief is a cosmetic miss; a
+# confidently wrong one is a clinical incident.
+#
+# Drug names (INN) and numeric doses are never touched by anything here.
+_FREQUENCY_TABLES: dict[str, tuple[tuple[str, str], ...]] = {
+    "es": (
+        (r"once daily|once a day|one daily|daily|od|o\.d\.|q24h|every 24 ?h(?:ours|rs|r)?",
+         "1 vez al día (c/24h)"),
+        (r"twice daily|twice a day|bid|b\.i\.d\.|bd|q12h|every 12 ?h(?:ours|rs|r)?",
+         "cada 12h"),
+        (r"three times daily|three times a day|tid|t\.i\.d\.|tds|q8h|every 8 ?h(?:ours|rs|r)?",
+         "cada 8h"),
+        # Not in the original list but the unambiguous next term in the same
+        # series; leaving it out would localise three of four dosing schedules.
+        (r"four times daily|four times a day|qid|q\.i\.d\.|qds|q6h|every 6 ?h(?:ours|rs|r)?",
+         "cada 6h"),
+        (r"at night|nocte|at bedtime|before bed|nightly|every night", "por la noche"),
+        (r"every morning|each morning|in the morning|mane", "por la mañana"),
+        (r"as directed|as per instructions", "según pauta"),
+    ),
+}
+
+
+def localize_frequency(value: Any, target: str) -> Any:
+    """Map a dosing frequency into `target`, or return it untouched.
+
+    Deliberately conservative: the whole string must match one entry. A value
+    like "2 tablets twice daily" is left alone rather than part-translated,
+    because rewriting half a dosing instruction is worse than leaving all of
+    it in English.
+    """
+    table = _FREQUENCY_TABLES.get(target)
+    if not table or not isinstance(value, str) or not value.strip():
+        return value
+
+    # Normalise only for matching; the original is what gets returned on a miss.
+    key = re.sub(r"\s+", " ", value.strip().lower()).strip(" .")
+    for pattern, replacement in table:
+        if re.fullmatch(pattern, key):
+            return replacement
+    return value
+
+
 def _clean(value: Any) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
@@ -314,15 +369,25 @@ def sanitize_content(raw: Any) -> dict:
     return out
 
 
-def merge_translation(source: dict, translated: Any) -> dict:
+def merge_translation(source: dict, translated: Any, target: str = "") -> dict:
     """Take translated prose from the model, everything clinical from source.
 
     This is not defensive tidying, it is the safety boundary. A translation
     pass must not be able to alter a drug name, a dose, a patient's name or an
     ID -- so those are copied from the already-extracted content and the model's
     version of them is discarded, whatever it said.
+
+    Frequency is the one exception, and even there the model gets no say: it
+    goes through `localize_frequency`, a fixed lookup table.
     """
     out = sanitize_content(source)
+
+    # Applied whether or not the model returned anything usable, so a failed
+    # translation still yields a readable Spanish frequency column.
+    for med in out["medications"]:
+        if "frequency" in med:
+            med["frequency"] = localize_frequency(med["frequency"], target)
+
     if not isinstance(translated, dict):
         return out
 

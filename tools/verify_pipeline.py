@@ -253,6 +253,21 @@ def main() -> int:
         check("translation preserved drug names", "bisoprolol" in tr_names, ", ".join(sorted(tr_names)))
         tr_bis = next((m for m in tr_meds if m.get("name", "").lower() == "bisoprolol"), {})
         check("translation preserved the dose", tr_bis.get("dose") == "2.5 mg", str(tr_bis.get("dose")))
+        # Frequency is localised by a lookup table, not the model -- see
+        # localize_frequency. Drug name and dose above must be untouched.
+        tr_freqs = {m.get("name", "").lower(): m.get("frequency") for m in tr_meds}
+        check("frequency localised to Spanish",
+              tr_freqs.get("bisoprolol") == "1 vez al día (c/24h)", str(tr_freqs.get("bisoprolol")))
+        check("twice-daily localised", tr_freqs.get("metformin") == "cada 12h",
+              str(tr_freqs.get("metformin")))
+        check("at-night localised", tr_freqs.get("atorvastatin") == "por la noche",
+              str(tr_freqs.get("atorvastatin")))
+        check("as-directed localised", tr_freqs.get("warfarin") in ("según pauta", None),
+              str(tr_freqs.get("warfarin")))
+        check("English source frequency untouched in source content",
+              next((m.get("frequency") for m in meds if m.get("name","").lower()=="bisoprolol"), None)
+              == "once daily")
+
         check("translation rendered the flags into Spanish",
               bool(tr.get("flagged_items")) and tr.get("flagged_items") != flags,
               " | ".join(tr.get("flagged_items") or [])[:160])
