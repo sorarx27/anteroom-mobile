@@ -58,6 +58,13 @@ kotlin {
         androidMain.get().kotlin.srcDir("src/mobileMain/kotlin")
         iosMain.get().kotlin.srcDir("src/mobileMain/kotlin")
 
+        // GitLive ships a Storage implementation for Android, Apple and the web
+        // but not the JVM, where every member is TODO(). Those three share one
+        // upload path; Desktop has its own, over the Storage REST API.
+        androidMain.get().kotlin.srcDir("src/gitliveStorageMain/kotlin")
+        iosMain.get().kotlin.srcDir("src/gitliveStorageMain/kotlin")
+        jsMain.get().kotlin.srcDir("src/gitliveStorageMain/kotlin")
+
         // Compose Multiplatform's skiko-backed targets share API that the Android actual lacks
         // (DialogProperties.scrimColor). Same one-directory trick as mobileMain.
         iosMain.get().kotlin.srcDir("src/skikoMain/kotlin")

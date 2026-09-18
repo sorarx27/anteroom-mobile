@@ -2,6 +2,8 @@ package com.zayedmd.anteroom.firebase
 
 import com.zayedmd.anteroom.data.BriefsRepositoryImpl
 import com.zayedmd.anteroom.data.ProfilesRepositoryImpl
+import com.zayedmd.anteroom.storage.StoragePaths
+import com.zayedmd.anteroom.storage.uploadPage
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -48,10 +50,42 @@ class DesktopFirebaseTest {
         val briefs = BriefsRepositoryImpl().getBriefs(null)
         println("desktop read ${briefs.size} brief(s)")
 
-        // Storage genuinely has no JVM implementation in GitLive 2.1.0. The
-        // probe must say so rather than throwing NotImplementedError into a
-        // screen, which is the whole reason FirebaseService is lazy.
+        // GitLive has no JVM Storage -- every member is TODO() -- which is
+        // why the probe must report it rather than throwing
+        // NotImplementedError into a screen, and why uploads take the REST
+        // path on this target.
         println("storage supported on desktop: ${FirebaseService.storageSupported}")
-        assertTrue(!FirebaseService.storageSupported, "expected Storage to be unavailable on JVM")
+        assertTrue(!FirebaseService.storageSupported, "expected GitLive Storage to be absent on JVM")
+
+        // The REST upload is the thing that makes Desktop usable at all, so
+        // it is exercised for real: same bucket, same rules, same filename
+        // pattern the phone has to satisfy.
+        val jpeg = javaClass.classLoader.getResourceAsStream("desktop_upload_probe.jpg")?.readBytes()
+            ?: minimalJpeg()
+        val path = StoragePaths.pagePath(uid, "desktopprobe", "desktopprobe1", "image/jpeg")
+        val url = uploadPage(path, jpeg, "image/jpeg")
+        println("desktop uploaded ${jpeg.size} bytes -> ${url.substringBefore('?')}")
+        assertTrue(url.startsWith("https://"), "upload returned no URL")
+
+        // And the rules must still bite on this path: a filename the pattern
+        // rejects has to fail, or Desktop would be a way around them.
+        val bad = runCatching {
+            uploadPage("users/$uid/briefs/desktopprobe/pages/not-allowed.jpg", jpeg, "image/jpeg")
+        }
+        assertTrue(bad.isFailure, "storage.rules did not reject a bad filename over REST")
+        println("desktop rejected bad filename: ${bad.exceptionOrNull()?.message}")
     }
+
+    /** A 1x1 JPEG, so the test does not depend on a checked-in fixture. */
+    private fun minimalJpeg(): ByteArray = byteArrayOf(
+        0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 0x00, 0x10,
+        0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01,
+        0x00, 0x00, 0xFF.toByte(), 0xDB.toByte(), 0x00, 0x43, 0x00,
+    ) + ByteArray(64) { 0x10 } + byteArrayOf(
+        0xFF.toByte(), 0xC9.toByte(), 0x00, 0x0B, 0x08, 0x00, 0x01, 0x00, 0x01,
+        0x01, 0x01, 0x11, 0x00, 0xFF.toByte(), 0xCC.toByte(), 0x00, 0x06, 0x00,
+        0x10, 0x10, 0x05, 0xFF.toByte(), 0xDA.toByte(), 0x00, 0x08, 0x01, 0x01,
+        0x00, 0x00, 0x3F, 0x00, 0xD2.toByte(), 0xCF.toByte(), 0x20,
+        0xFF.toByte(), 0xD9.toByte()
+    )
 }

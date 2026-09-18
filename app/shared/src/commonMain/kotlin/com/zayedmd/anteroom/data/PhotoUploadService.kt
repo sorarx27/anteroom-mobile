@@ -5,8 +5,7 @@ import com.zayedmd.anteroom.media.CapturedPhoto
 import com.zayedmd.anteroom.model.Brief
 import com.zayedmd.anteroom.model.BriefPhoto
 import com.zayedmd.anteroom.storage.StoragePaths
-import com.zayedmd.anteroom.storage.storageData
-import dev.gitlive.firebase.storage.FirebaseStorageMetadata
+import com.zayedmd.anteroom.storage.uploadPage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,12 +35,6 @@ class PhotoUploadService(
     suspend fun uploadPhotos(briefId: String, photos: List<CapturedPhoto>): Brief? {
         if (photos.isEmpty()) return briefsRepository.getBrief(briefId)
         _lastError.value = null
-
-        if (!FirebaseService.storageSupported) {
-            _lastError.value =
-                "Photo upload isn't available on this platform yet. Use the Android or iOS app."
-            return briefsRepository.getBrief(briefId)
-        }
 
         val uid = try {
             requireUid()
@@ -85,16 +78,7 @@ class PhotoUploadService(
             _uploadingCount.value += 1
             try {
                 val path = StoragePaths.pagePath(uid, briefId, photo.id, contentType)
-                val ref = FirebaseService.storage.reference(path)
-
-                // The content type has to be set explicitly. Without it the
-                // object lands as application/octet-stream and the storage
-                // rule's contentType check rejects the write with a bare
-                // PERMISSION_DENIED that names nothing.
-                ref.putData(
-                    storageData(bytes),
-                    FirebaseStorageMetadata(contentType = contentType)
-                )
+                val url = uploadPage(path, bytes, contentType)
 
                 current = briefsRepository.addPhotoToBrief(
                     briefId,
@@ -104,7 +88,7 @@ class PhotoUploadService(
                         content_type = contentType,
                         size = bytes.size.toLong(),
                         storage_path = path,
-                        url = ref.getDownloadUrl()
+                        url = url
                     )
                 ) ?: current
             } catch (e: Exception) {
@@ -135,6 +119,9 @@ class PhotoUploadService(
         }
 
         if (photo.storage_path.isNotBlank() && FirebaseService.storageSupported) {
+            // Best effort, and only where the SDK can do it. Desktop uploads
+            // over REST but has no delete path; an orphaned object costs a
+            // fraction of a cent and the brief no longer points at it.
             runCatching { FirebaseService.storage.reference(photo.storage_path).delete() }
         }
         return updated

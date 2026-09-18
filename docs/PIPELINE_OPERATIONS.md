@@ -125,6 +125,35 @@ dose has been blurred and blotted, and asserts the dose is **absent** from
 tested rather than asserted: a model that guesses a plausible dose passes any
 test that only checks the readable rows.
 
+## Storage on Desktop
+
+GitLive 2.1.0 has no JVM implementation of Storage -- every member of the
+JVM actual is `TODO()`. Rather than leave Desktop unable to add a page,
+`uploadPage` is an expect/actual seam: Android, Apple and the web go through
+the SDK, Desktop posts to the Storage REST API with the signed-in user's ID
+token.
+
+That is not a back door. The REST path carries the same credential and is
+subject to the same `storage.rules`, which the Desktop test proves by
+uploading a valid page and then asserting a filename outside the
+`photo_[A-Za-z0-9]+\.(jpg|png|webp)` pattern is refused:
+
+```
+ANTEROOM_TEST_EMAIL=... ANTEROOM_TEST_PASSWORD=... ./gradlew :app:shared:jvmTest
+```
+
+```
+desktop signed in as y7VL9...
+desktop read 13 brief(s)
+storage supported on desktop: false      <- GitLive SDK, as expected
+desktop uploaded 125 bytes -> https://firebasestorage.googleapis.com/...
+desktop rejected bad filename: PERMISSION_DENIED uploading page
+```
+
+Desktop sign-in is not persisted between launches; see the comment on
+`DesktopFirebasePlatform` for why a refresh token for this account does not
+belong on disk unencrypted.
+
 ## Gotcha: the Android emulator loses DNS
 
 It presents as Firestore `UNAVAILABLE` / `UnknownHostException` and looks like
