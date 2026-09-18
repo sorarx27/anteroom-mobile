@@ -4,11 +4,11 @@ In Spain the appointment is ten minutes and the paperwork is a folder.
 
 2
 00:00:05,150 --> 00:00:08,850
-Some of it is unreadable. A guessed dose is worse than none.
+Some of it is unreadable. Guessing is worse.
 
 3
 00:00:09,150 --> 00:00:13,850
-Anteroom turns that folder into one structured brief before the visit starts.
+Anteroom turns that folder into one structured brief.
 
 4
 00:00:14,150 --> 00:00:20,850
@@ -24,7 +24,7 @@ Gemini Flash types the document. You can override it in one tap.
 
 7
 00:00:34,150 --> 00:00:38,850
-Generate. Gemini 2.5 Pro reads both pages, in the EU.
+Gemini 2.5 Pro reads both pages, in the EU.
 
 8
 00:00:39,150 --> 00:00:43,850
@@ -36,7 +36,7 @@ It found seven medications. And it refused to guess the eighth.
 
 10
 00:00:51,150 --> 00:00:56,850
-Every other drug has its dose, verbatim. Warfarin has none, because the page did not.
+Every other drug has its dose, verbatim. Warfarin has none.
 
 11
 00:00:57,150 --> 00:01:01,850
@@ -48,15 +48,15 @@ Export a PDF for the clinic. On the free tier the server watermarks it.
 
 13
 00:01:08,150 --> 00:01:12,850
-Pro removes the watermark and renders it in Spanish. Doses are never translated.
+Pro removes the watermark and renders it in Spanish.
 
 14
 00:01:13,150 --> 00:01:17,850
-RevenueCat's Kotlin Multiplatform SDK — one implementation, two stores.
+RevenueCat purchases-kmp — one implementation, two stores.
 
 15
 00:01:18,150 --> 00:01:22,850
-A RevenueCat webhook writes the entitlement. The client cannot unlock itself.
+The server decides, not the client. It cannot unlock itself.
 
 16
 00:01:23,150 --> 00:01:30,850

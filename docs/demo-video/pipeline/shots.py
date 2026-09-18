@@ -9,13 +9,13 @@ SHOTS = [
     dict(id="problem-1", dur=5, kind="static", img="st_problem-1.png",
          cap="In Spain the appointment is ten minutes and the paperwork is a folder."),
     dict(id="problem-2", dur=4, kind="static", img="st_problem-2.png",
-         cap="Some of it is unreadable. A guessed dose is worse than none."),
+         cap="Some of it is unreadable. Guessing is worse."),
 
     dict(id="hero-1", dur=5, kind="hold", src=f"{FOOT}/take1_cfr.mp4", ss=0.5, take=2.8,
          eyebrow="Anteroom",
          head="The waiting room does the paperwork",
          sub="A real account on a real device, signed into the live project.",
-         cap="Anteroom turns that folder into one structured brief before the visit starts."),
+         cap="Anteroom turns that folder into one structured brief."),
 
     dict(id="capture-1", dur=7, kind="video", src=f"{FOOT}/take1_cfr.mp4", ss=12.0,
          eyebrow="Step 1",
@@ -39,7 +39,7 @@ SHOTS = [
          eyebrow="Step 3",
          head="One structured brief",
          sub="Gemini 2.5 Pro reads both pages — in europe-west1.",
-         cap="Generate. Gemini 2.5 Pro reads both pages, in the EU."),
+         cap="Gemini 2.5 Pro reads both pages, in the EU."),
 
     dict(id="generate-2", dur=5, kind="video", src=f"{FOOT}/take2_cfr.mp4", ss=19.0,
          eyebrow="Step 3", badge="~18 s of model time, trimmed",
@@ -57,7 +57,7 @@ SHOTS = [
          eyebrow="The part that matters",
          head="No dose. Not a guessed dose.",
          sub="Every other drug carries its dose verbatim.",
-         cap="Every other drug has its dose, verbatim. Warfarin has none, because the page did not."),
+         cap="Every other drug has its dose, verbatim. Warfarin has none."),
 
     dict(id="flag-3", dur=5, kind="video", src=f"{FOOT}/take3_cfr.mp4", ss=6.0,
          eyebrow="Provenance",
@@ -72,11 +72,11 @@ SHOTS = [
          cap="Export a PDF for the clinic. On the free tier the server watermarks it."),
 
     dict(id="export-2",  dur=5, kind="static", img="st_export-2.png",
-         cap="Pro removes the watermark and renders it in Spanish. Doses are never translated."),
+         cap="Pro removes the watermark and renders it in Spanish."),
     dict(id="billing-1", dur=5, kind="static", img="st_billing-1.png",
-         cap="RevenueCat's Kotlin Multiplatform SDK — one implementation, two stores."),
+         cap="RevenueCat purchases-kmp — one implementation, two stores."),
     dict(id="billing-2", dur=5, kind="static", img="st_billing-2.png",
-         cap="A RevenueCat webhook writes the entitlement. The client cannot unlock itself."),
+         cap="The server decides, not the client. It cannot unlock itself."),
     dict(id="cta-1",     dur=8, kind="static", img="st_cta-1.png",
          cap="Android, iOS, desktop and web — from one Kotlin codebase."),
 ]

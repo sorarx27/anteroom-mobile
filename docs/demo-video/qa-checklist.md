@@ -42,8 +42,10 @@ Anything marked ✗ is a real deviation with a reason, not an oversight.
 ## Captions
 
 - [x] 16 cues, one per shot, never two on screen at once.
-- [x] Worst reading speed 17.0 chars/sec, at the guideline. The `billing-1`
-      caption was rewritten to get there — it was 18.9.
+- [x] Worst reading speed 14.9 chars/sec, comfortably inside the 17 guideline.
+      Seven captions were shortened to get there; because the caption, the
+      `<voiceover>` and the spoken line are one string, all three improved at
+      once.
 - [x] No cue under 1.0s.
 - [ ] ✗ Four cues run 6.7–7.7s, over the 6.0s guideline. **Deliberate.** These
       captions are part of the frame composition and are timed to the shot, so
@@ -52,6 +54,19 @@ Anything marked ✗ is a real deviation with a reason, not an oversight.
       the cue is simply present longer than it needs to be.
 - [x] Cues break at sentence boundaries; none splits a clause across a cut.
 - [x] Checked against the render at 1.5×.
+
+## Audio
+
+- [x] Narration present across the whole timeline; measured mean −19 to
+      −23 dBFS, peaks −1.5 to −3.2 dBFS, no clipping.
+- [x] Normalised to −16 LUFS, which is the loudness judges' players expect.
+- [x] Every spoken line matches its caption word for word.
+- [x] Each line fits its shot; two run 0.0–0.3s long, which reads as pacing
+      rather than as a mistake.
+- [ ] ✗ The voice is synthetic (macOS `say`, Daniel en_GB). It is accurate and
+      well-timed but it is not a person. Flagged rather than hidden:
+      `anteroom-demo-silent.mp4` exists precisely so it can be replaced, and
+      `script.md` carries the timings to read against.
 
 ## Honesty
 

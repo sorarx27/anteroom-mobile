@@ -34,7 +34,7 @@
           <visual>Same two pages; a red ring draws around the illegible Warfarin dose.</visual>
           <text>Some of it is unreadable.</text>
           <motion>Ring draws on over 600ms, then holds.</motion>
-          <voiceover>Some of it is unreadable. A guessed dose is worse than none.</voiceover>
+          <voiceover>Some of it is unreadable. Guessing is worse.</voiceover>
         </shot>
       </shots>
     </scene>
@@ -46,7 +46,7 @@
           <visual>Anteroom dashboard on a real Android device, signed in.</visual>
           <text>Anteroom turns the folder into one brief.</text>
           <motion>Hard cut from the paper. Phone settles into frame.</motion>
-          <voiceover>Anteroom turns that folder into one structured brief before the visit starts.</voiceover>
+          <voiceover>Anteroom turns that folder into one structured brief.</voiceover>
         </shot>
       </shots>
     </scene>
@@ -88,7 +88,7 @@
           <visual>Generate brief tapped; the processing dialog runs, reading "This usually takes 5-10 seconds".</visual>
           <text>3 - One structured brief</text>
           <motion>Real-time.</motion>
-          <voiceover>Generate. Gemini 2.5 Pro reads both pages, in the EU.</voiceover>
+          <voiceover>Gemini 2.5 Pro reads both pages, in the EU.</voiceover>
         </shot>
         <shot id="generate-2" duration="5">
           <visual>The finished brief appears. An on-screen label states that model time was trimmed.</visual>
@@ -112,7 +112,7 @@
           <visual>Scrolled to the medication list: every drug shows dose and frequency, Warfarin shows "as directed" and no dose line at all.</visual>
           <text>No dose. Not a guessed dose.</text>
           <motion>Slow scroll stops on the Warfarin row.</motion>
-          <voiceover>Every other drug has its dose, verbatim. Warfarin has none, because the page did not.</voiceover>
+          <voiceover>Every other drug has its dose, verbatim. Warfarin has none.</voiceover>
         </shot>
         <shot id="flag-3" duration="5">
           <visual>Source documents strip, then the full-screen page inspector showing the original blotted prescription.</visual>
@@ -136,7 +136,7 @@
           <visual>The two real PDFs side by side: the watermarked English free export and the clean Spanish Pro export.</visual>
           <text>Pro: clean, and in Spanish</text>
           <motion>Free page fades to the Pro page; the watermark disappears and the labels turn Spanish.</motion>
-          <voiceover>Pro removes the watermark and renders it in Spanish. Doses are never translated.</voiceover>
+          <voiceover>Pro removes the watermark and renders it in Spanish.</voiceover>
         </shot>
       </shots>
     </scene>
@@ -148,13 +148,13 @@
           <visual>The Anteroom Pro paywall on Android, showing the monthly and lifetime packages from the live offering.</visual>
           <text>RevenueCat purchases-kmp</text>
           <motion>Paywall slides up. Hold on the packages.</motion>
-          <voiceover>Billing is RevenueCat's Kotlin Multiplatform SDK - one implementation, Play and StoreKit.</voiceover>
+          <voiceover>RevenueCat purchases-kmp - one implementation, two stores.</voiceover>
         </shot>
         <shot id="billing-2" duration="5">
           <visual>Terminal frame: the pipeline suite printing "translateBrief denied for free user :: PERMISSION_DENIED" and "Pro PDF is NOT watermarked :: False".</visual>
           <text>The gate is on the server, not the client</text>
           <motion>Lines print in sequence; the two verdict lines highlight.</motion>
-          <voiceover>A RevenueCat webhook writes the entitlement, and the server decides. The client cannot unlock itself.</voiceover>
+          <voiceover>The server decides, not the client. It cannot unlock itself.</voiceover>
         </shot>
       </shots>
     </scene>

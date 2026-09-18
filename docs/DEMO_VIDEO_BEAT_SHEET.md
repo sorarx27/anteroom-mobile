@@ -5,7 +5,8 @@ the rendered master, and the build pipeline.
 
 | File | What it is |
 | --- | --- |
-| [`demo-video/anteroom-demo.mp4`](./demo-video/anteroom-demo.mp4) | The cut. 1920x1080, 30fps, 91s, burned-in captions, no audio. |
+| [`demo-video/anteroom-demo.mp4`](./demo-video/anteroom-demo.mp4) | The cut, narrated. 1920x1080, 30fps, 91s, burned-in captions. |
+| [`demo-video/anteroom-demo-silent.mp4`](./demo-video/anteroom-demo-silent.mp4) | Same picture, no audio — re-voice from this. |
 | [`demo-video/storyboard.xml`](./demo-video/storyboard.xml) | Source of truth. Edit this, not the renderer. |
 | [`demo-video/script.md`](./demo-video/script.md) | Voice-over, timed to the cut. |
 | [`demo-video/captions.srt`](./demo-video/captions.srt) | Matches the burned-in captions exactly. |
@@ -41,5 +42,7 @@ each one.
 - Re-shoot the billing scene on Android once Play Console products exist. The
   Android paywall currently shows a RevenueCat "no products registered" error,
   so the cut uses the real iOS paywall capture instead.
-- Optionally record the voice-over in `script.md` and mux it on; the master is
-  deliberately silent and caption-led.
+- Re-record the narration in your own voice. The master currently uses a
+  synthetic one; `script.md` has the timings and
+  `anteroom-demo-silent.mp4` is there to mux onto. A clinician narrating his
+  own clinical-safety argument beats any amount of production polish.

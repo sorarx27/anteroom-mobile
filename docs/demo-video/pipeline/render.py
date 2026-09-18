@@ -6,7 +6,7 @@ from frames import phone_overlay, PX, PY, PW, PH
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SEG = os.path.join(HERE, "seg"); os.makedirs(SEG, exist_ok=True)
-OUT = os.path.join(HERE, "anteroom-demo.mp4")
+OUT = os.path.join(HERE, "anteroom-demo-silent.mp4")
 
 V = ["-c:v", "libx264", "-preset", "medium", "-crf", "17",
      "-pix_fmt", "yuv420p", "-r", "30", "-an"]

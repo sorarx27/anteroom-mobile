@@ -2,13 +2,24 @@
 
 ## Output
 
-`anteroom-demo.mp4` — 1920x1080, 30fps, H.264 CRF 17, **no audio**, 91s, ~2 MB.
+Two files, same picture:
 
-Captions are burned in, because demo videos are watched sound-off. If you
-record the voice-over in `script.md`, mux it on rather than re-rendering:
+| File | Audio | Use |
+| --- | --- | --- |
+| `anteroom-demo.mp4` | narrated | the one to upload |
+| `anteroom-demo-silent.mp4` | none | re-voice from this |
+
+1920x1080, 30fps, H.264 CRF 17, 91s. Captions are burned in either way,
+because plenty of judges watch sound-off.
+
+The narration is macOS `say` (Daniel, en_GB), timed per shot by
+`pipeline/voice.py`. It is clear and correctly placed, and it is obviously
+synthetic — replacing it with a real read is the single cheapest upgrade this
+video has left:
 
 ```
-ffmpeg -i anteroom-demo.mp4 -i vo.wav -c:v copy -c:a aac -shortest anteroom-demo-vo.mp4
+ffmpeg -i anteroom-demo-silent.mp4 -i your-vo.wav \
+       -c:v copy -c:a aac -b:a 192k anteroom-demo.mp4
 ```
 
 ## Rebuilding
@@ -16,7 +27,8 @@ ffmpeg -i anteroom-demo.mp4 -i vo.wav -c:v copy -c:a aac -shortest anteroom-demo
 ```
 cd docs/demo-video/pipeline
 python3 build_frames.py     # static frames
-python3 render.py           # segments, then the concatenated master
+python3 render.py           # segments -> anteroom-demo-silent.mp4
+python3 voice.py            # narration -> anteroom-demo.mp4
 ```
 
 Both need Pillow and ffmpeg. `render.py` expects the three source recordings
@@ -53,3 +65,9 @@ The `_cfr` step is not optional — see `engine-decision.md`.
   scene on Android once the Play Console products exist.
 - **No stock footage, no mockups, no invented UI.** Every phone frame is a
   recording of the app against the live backend.
+- **No music.** A bed would mask the flatness of the synthetic voice, but it
+  is not something that can be judged without listening, so it was left out
+  rather than guessed at. Add one when you re-record.
+- **Lines are fitted by speaking rate, never by clipping.** Where a line
+  would not fit its shot, the line was shortened — in the storyboard, the
+  caption and the narration together, so the three cannot disagree.

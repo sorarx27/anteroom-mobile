@@ -42,7 +42,7 @@ def problem(ring=False):
         d.text((x, y), "And some of it cannot be read.", font=font(50, bold=True), fill=PAPER)
         d.text((x, y + 62), "A guessed dose is worse than no dose.",
                font=font(50, bold=True), fill=(236, 138, 130))
-        caption_bar(base, "Some of it is unreadable. A guessed dose is worse than none.")
+        caption_bar(base, "Some of it is unreadable. Guessing is worse.")
     return base
 
 save(problem(False), "st_problem-1.png")
@@ -63,7 +63,7 @@ def pdf_compare():
     d.text((px, 900), "Clean, and in Spanish", font=font(30), fill=(168, 190, 178))
     ax = 250 + free.width + 42
     d.text((ax, 470), "→", font=font(80, bold=True), fill=BRAND_LT)
-    caption_bar(base, "Pro removes the watermark and renders it in Spanish. Doses are never translated.")
+    caption_bar(base, "Pro removes the watermark and renders it in Spanish.")
     return base
 
 save(pdf_compare(), "st_export-2.png")
@@ -85,7 +85,7 @@ def paywall_still():
                "One Kotlin implementation drives Google Play and StoreKit. "
                "The entitlement is anteroom_pro.",
                font(29), (168, 190, 178), 1090, 42)
-    caption_bar(base, "RevenueCat's Kotlin Multiplatform SDK — one implementation, two stores.")
+    caption_bar(base, "RevenueCat purchases-kmp — one implementation, two stores.")
     return base
 
 save(paywall_still(), "st_billing-1.png")
@@ -124,7 +124,7 @@ def terminal():
                font=fm, fill=(126, 150, 138))
         fy += 40
     d.text((tx + 40, fy + 26), "43/43 passed", font=font(30, mono=True), fill=(150, 214, 165))
-    caption_bar(base, "A RevenueCat webhook writes the entitlement. The client cannot unlock itself.")
+    caption_bar(base, "The server decides, not the client. It cannot unlock itself.")
     return base
 
 save(terminal(), "st_billing-2.png")
