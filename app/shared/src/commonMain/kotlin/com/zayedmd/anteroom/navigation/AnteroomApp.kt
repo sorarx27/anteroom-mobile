@@ -24,6 +24,7 @@ import com.zayedmd.anteroom.data.PhotoUploadService
 import com.zayedmd.anteroom.data.ProfilesRepository
 import com.zayedmd.anteroom.data.ProfilesRepositoryImpl
 import com.zayedmd.anteroom.debug.DebugOptions
+import com.zayedmd.anteroom.export.rememberPdfSharer
 import com.zayedmd.anteroom.media.CapturedPhoto
 import com.zayedmd.anteroom.model.Brief
 import com.zayedmd.anteroom.model.Profile
@@ -73,6 +74,7 @@ fun AnteroomApp(
     var showPaywallModal by remember { mutableStateOf(false) }
     var paywallTrigger by remember { mutableStateOf("family-profiles") }
 
+    val pdfSharer = rememberPdfSharer()
     val photoUploadService = remember { PhotoUploadService(briefsRepository) }
     val uploadingCount by photoUploadService.uploadingCount.collectAsState()
     val uploadError by photoUploadService.lastError.collectAsState()
@@ -314,9 +316,19 @@ fun AnteroomApp(
                                         // Fallback/log URL or open in browser
                                     },
                                     onDownloadPdf = {
-                                        if (!isSubscribed) {
-                                            paywallTrigger = "clean-export"
-                                            showPaywallModal = true
+                                        // The export runs for everyone. The
+                                        // server decides whether it comes back
+                                        // watermarked, so a free user still
+                                        // gets a usable brief and sees exactly
+                                        // what Pro removes -- which sells the
+                                        // upgrade better than a locked button.
+                                        scope.launchSafely {
+                                            val pdf = briefsRepository.renderBriefPdf(screen.briefId)
+                                            pdfSharer.share(pdf)
+                                            if (pdf.watermarked) {
+                                                paywallTrigger = "clean-export"
+                                                showPaywallModal = true
+                                            }
                                         }
                                     }
                                 )

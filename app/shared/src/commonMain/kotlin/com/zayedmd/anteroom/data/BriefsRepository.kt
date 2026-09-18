@@ -1,5 +1,6 @@
 package com.zayedmd.anteroom.data
 
+import com.zayedmd.anteroom.export.BriefPdf
 import com.zayedmd.anteroom.firebase.FirebaseService
 import com.zayedmd.anteroom.model.Brief
 import com.zayedmd.anteroom.model.BriefLanguage
@@ -8,6 +9,8 @@ import com.zayedmd.anteroom.model.BriefStatus
 import com.zayedmd.anteroom.model.DocType
 import dev.gitlive.firebase.firestore.Direction
 import dev.gitlive.firebase.firestore.Query
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.Serializable
 
@@ -22,6 +25,15 @@ interface BriefsRepository {
     suspend fun detectDocType(briefId: String): DocType
     suspend fun generateBrief(briefId: String, sourceLanguage: BriefLanguage): Brief
     suspend fun translateBrief(briefId: String, targetLanguage: BriefLanguage): Brief
+
+    /**
+     * Renders the brief as a PDF on the server.
+     *
+     * There is no `watermarked` parameter, deliberately: the server derives it
+     * from the entitlement. A client that could ask for a clean export would
+     * be the paywall.
+     */
+    suspend fun renderBriefPdf(briefId: String, language: BriefLanguage? = null): BriefPdf
 }
 
 // Callable payloads. Snake_case to match the Python side exactly; the Kotlin
@@ -34,6 +46,17 @@ private data class GenerateRequest(val brief_id: String, val source_language: St
 
 @Serializable
 private data class TranslateRequest(val brief_id: String, val target_language: String)
+
+@Serializable
+private data class RenderPdfRequest(val brief_id: String, val language: String? = null)
+
+@Serializable
+private data class RenderPdfResponse(
+    val filename: String,
+    val watermarked: Boolean,
+    val language: String,
+    val pdf_base64: String
+)
 
 /**
  * Firestore-backed briefs, stored flat at `briefs/{briefId}` with `user_id`
@@ -64,6 +87,9 @@ class BriefsRepositoryImpl : BriefsRepository {
     }
     private val classifyFn by lazy {
         FirebaseService.functions.httpsCallable("classifyDocType", timeout = 90.seconds)
+    }
+    private val renderPdfFn by lazy {
+        FirebaseService.functions.httpsCallable("renderBriefPdf", timeout = 120.seconds)
     }
 
     override suspend fun getBriefs(profileId: String?): List<Brief> {
@@ -178,6 +204,25 @@ class BriefsRepositoryImpl : BriefsRepository {
         )
         return getBrief(briefId)
             ?: throw IllegalStateException("Brief disappeared during translation")
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    override suspend fun renderBriefPdf(briefId: String, language: BriefLanguage?): BriefPdf {
+        // The only call here that returns a payload rather than re-reading
+        // Firestore: a PDF is not part of the document, and a one-page A4
+        // brief base64s to a few tens of kilobytes -- far inside the callable
+        // response limit, and cheaper than minting a signed URL to a file
+        // full of medical data.
+        val response = renderPdfFn
+            .invoke(RenderPdfRequest.serializer(), RenderPdfRequest(briefId, language?.key))
+            .data(RenderPdfResponse.serializer())
+
+        return BriefPdf(
+            filename = response.filename,
+            bytes = Base64.decode(response.pdf_base64),
+            watermarked = response.watermarked,
+            language = response.language
+        )
     }
 
     private companion object {
