@@ -48,13 +48,26 @@ object RevenueCatConfig {
     val iosApiKey: String
         get() = if (IOS_USE_APP_STORE) IOS_APP_STORE_API_KEY else TEST_API_KEY
 
+    /**
+     * Shown only when StoreKit or Play Billing has not returned an offering
+     * yet -- first paint, offline, or a simulator with no store.
+     *
+     * These must match the live App Store Connect and Play Console products
+     * exactly. They drifted once already: the catalogue said $7.99/mo and
+     * $129.99 while the real products were created at $9.99/month and
+     * $99.99, so any device that failed to resolve products advertised a
+     * price the store would not charge. That is a credibility problem in a
+     * demo and a rejection risk in review.
+     *
+     * App Store: monthly 6813462029 ($9.99/mo), lifetime 6813464622 ($99.99).
+     */
     val FALLBACK_MONTHLY = SubscriptionPackage(
         identifier = PACKAGE_MONTHLY,
         packageType = PackageType.MONTHLY,
         title = "Anteroom Pro Monthly",
         description = "Unlimited family profiles, clean doctor export & translation.",
-        priceString = "$7.99/mo",
-        priceMicros = 7_990_000L,
+        priceString = "$9.99/mo",
+        priceMicros = 9_990_000L,
         isLifetime = false
     )
 
@@ -63,8 +76,8 @@ object RevenueCatConfig {
         packageType = PackageType.LIFETIME,
         title = "Anteroom Pro Lifetime",
         description = "Permanent access. One-time unlock, all features forever.",
-        priceString = "$129.99",
-        priceMicros = 129_990_000L,
+        priceString = "$99.99",
+        priceMicros = 99_990_000L,
         isLifetime = true
     )
 

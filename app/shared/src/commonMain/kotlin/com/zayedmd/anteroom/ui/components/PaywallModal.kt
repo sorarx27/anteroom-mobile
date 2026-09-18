@@ -323,7 +323,7 @@ fun PaywallModal(
                                 )
                             } else {
                                 Text(
-                                    text = "Continue with ${selectedPackage?.priceString ?: "$7.99/mo"}",
+                                    text = "Continue with ${selectedPackage?.priceString ?: RevenueCatConfig.FALLBACK_MONTHLY.priceString}",
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold
                                 )
