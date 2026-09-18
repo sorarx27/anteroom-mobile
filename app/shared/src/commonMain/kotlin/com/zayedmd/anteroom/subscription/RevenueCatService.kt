@@ -42,7 +42,7 @@ object RevenueCatConfig {
      * Flip to true before any TestFlight build that goes through App Review - RevenueCat warns
      * that a Test Store key is grounds for rejection.
      */
-    const val IOS_USE_APP_STORE = false
+    const val IOS_USE_APP_STORE = true
 
     /** App Store key once the products exist, Test Store key until then. */
     val iosApiKey: String
