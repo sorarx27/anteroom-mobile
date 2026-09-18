@@ -10,7 +10,6 @@ struct iOSApp: App {
         FirebaseApp.configure()
 
         // Simulator QA flags. A normally launched app passes no arguments, so these stay off.
-        IosLaunchArgumentsKt.applyDebugLaunchArguments()
 
         // Configure StoreKit through purchases-kmp before the first Compose frame, so the
         // offerings cache is warm by the time the paywall can be reached. The API key is

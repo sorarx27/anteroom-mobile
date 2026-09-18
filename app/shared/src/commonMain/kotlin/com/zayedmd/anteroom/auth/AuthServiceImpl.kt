@@ -3,7 +3,6 @@ package com.zayedmd.anteroom.auth
 import com.zayedmd.anteroom.model.AppUser
 import com.zayedmd.anteroom.data.ProfilesRepository
 import com.zayedmd.anteroom.data.ProfilesRepositoryImpl
-import com.zayedmd.anteroom.debug.DebugOptions
 import com.zayedmd.anteroom.firebase.FirebaseService
 import dev.gitlive.firebase.auth.FirebaseUser
 import dev.gitlive.firebase.auth.GoogleAuthProvider
@@ -27,13 +26,7 @@ class AuthServiceImpl(
     private val scope = CoroutineScope(Dispatchers.Default)
 
     init {
-        if (DebugOptions.demoAuth) {
-            // Simulator QA path only - see DebugOptions. Unreachable from a normal launch.
-            _user.value = DebugOptions.DEMO_USER
-            _status.value = AuthStatus.Authenticated
-        } else {
-            observeFirebaseAuth()
-        }
+        observeFirebaseAuth()
     }
 
     private fun observeFirebaseAuth() {

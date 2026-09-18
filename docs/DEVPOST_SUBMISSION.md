@@ -89,6 +89,21 @@ model's accuracy. Three decisions enforce it:
 A clinician doesn't need the app to be right. A clinician needs to know,
 fast, where the app is unsure.
 
+This is tested, not asserted. `tools/sample_page_illegible.jpg` is a
+prescription whose Warfarin dose has been blurred and blotted out. A model
+that guesses a plausible dose passes any test that only checks the readable
+rows, so the end-to-end suite asserts the opposite: that the dose is
+**absent** from `medications` and **present** in `flagged_items`. Against
+the live backend it comes back as
+
+```
+medications: ... Warfarin (no dose) as directed
+flagged:     Warfarin dose unreadable on page 2
+```
+
+and the brief screen renders Warfarin as the one medication in the list
+with no dose line under it.
+
 ## How we built it
 
 The whole product is one Kotlin Multiplatform codebase.
@@ -99,6 +114,8 @@ The whole product is one Kotlin Multiplatform codebase.
 | Shared logic | Kotlin Multiplatform 2.4.20 |
 | Targets | Android, iOS (arm64 and simulator), Desktop (JVM), Web (JS) |
 | Auth and data | Firebase Auth, Firestore, and Storage through GitLive |
+| Backend | Firebase Cloud Functions, Python 3.12, `europe-west1` |
+| Extraction | Gemini 2.5 Pro and 2.5 Flash on Vertex AI, `europe-west1` |
 | Billing | RevenueCat `purchases-kmp` 3.8.0 |
 | Networking | Ktor client |
 
@@ -157,33 +174,102 @@ Failures are handled as distinct cases rather than one generic error:
 - An unreachable store falls back to dashboard pricing so the paywall still
   renders, and surfaces the reason.
 
+### The extraction pipeline
+
+Four callables and a webhook, deployed to `europe-west1`. The client never
+writes a clinical field: `firestore.rules` rejects `content`, `status`,
+`generated_at` and the share token from any client, and the Admin SDK inside
+these functions is the only thing that may. "Nothing invented" is therefore
+a property of the system rather than a promise about the UI.
+
+| Function | Model | Owns |
+| --- | --- | --- |
+| `classifyDocType` | Gemini 2.5 Flash | `detected_doc_type`, `detected_confidence` |
+| `generateBrief` | Gemini 2.5 Pro | `content`, `status`, `generated_at` |
+| `translateBrief` | Gemini 2.5 Pro | `content_translations` |
+| `renderBriefPdf` | none | nothing — returns bytes |
+| `revenuecatWebhook` | none | `users/{uid}/billing/entitlement` |
+
+**Everything stays in the EU.** Firestore is `eur3`, functions and Vertex AI
+are both pinned to `europe-west1`. That costs us model capability and we
+took the trade knowingly: Gemini 3.x exists on Vertex, but only on the
+`global` endpoint, which routes a photograph of someone's referral letter to
+whichever region Google picks. These are medical documents, so the residency
+is worth more than the newer model.
+
+**Translation cannot touch a dose.** `merge_translation` takes prose from
+the model and every clinical field from the already-extracted content, so a
+translation pass is structurally unable to alter a drug name, a dose, a
+frequency, a patient's name or an ID. The test feeds it a deliberately
+hostile response that corrupts all of those and asserts none of it lands.
+Dosing frequency *is* localised for Spanish clinicians — by a fixed lookup
+table, not the model, and anything the table doesn't recognise is left in
+the source language rather than guessed at.
+
+**The paywall moved server-side.** `renderBriefPdf` takes no `watermarked`
+argument. The server derives it from the entitlement, so the clean export —
+one of the two things Pro sells — stopped being a boolean the client could
+flip. `translateBrief` returns `PERMISSION_DENIED` to a free caller. The
+RevenueCat webhook is the only writer of that entitlement document.
+
+**It spends real money, so it has a brake.** A per-user daily cap charged
+transactionally *before* the model call, and a kill switch at
+`config/runtime.ai_enabled` read on every call — flip it and spend stops
+within seconds, with no deploy. Pages are downscaled to a 1536px long edge on
+both the client and the server, because the server must not depend on a
+client having behaved. A two-page brief costs about **$0.02** end to end.
+
 ## What runs today
 
 Being precise about this matters more than the pitch does.
 
-**Live and real:**
+**Live and verified against the deployed project:**
 
 - The complete Compose Multiplatform UI across Android, iOS, Desktop, and
   Web.
 - RevenueCat billing through `purchases-kmp`: offerings fetch, package
   purchase, restore, customer info refresh, and delegate-driven entitlement
   updates, all verified against `anteroom_pro`.
-- Firebase authentication, Firestore persistence, and Storage photo upload.
-- Family profile management, document capture, and the clinical brief view
-  with flagged-item banners and photo verification.
-- Every paywall gate in the app, driven by the verified entitlement.
+- Firebase authentication, Firestore persistence, and Storage photo upload —
+  including on Desktop, which uploads over the Storage REST API because
+  GitLive ships no JVM implementation.
+- Real extraction: a photographed referral and a photographed prescription
+  become a populated `BriefContent` in about 13 seconds, with the illegible
+  dose flagged rather than guessed.
+- Translation into Spanish, and PDF export whose watermark is decided by the
+  server.
+- Family profile management and the clinical brief view with flagged-item
+  banners and photo verification against the original page.
 
-**Stubbed, and honest about it:**
+**Honest limits:**
 
-- Document classification, brief generation, and translation currently
-  return fixed sample content behind a delay in `BriefsRepositoryImpl`. The
-  schema, the flagging behavior, and the full user journey are real; the
-  extraction model behind them isn't wired yet.
-- The Ktor server module is a scaffold.
+- Two languages, English and Spanish.
+- Six pages per brief. The cap is the spend ceiling as much as a product
+  limit, and it is enforced in the security rules, not just the client.
+- The public share page was cut. An earlier build advertised a QR code
+  pointing at a guessable `/s/{brief_id}` URL; the page, the QR and the
+  claim were removed together.
+- Desktop and Web run `SimulatedRevenueCatService` for billing and label
+  themselves as a simulation on screen. Everything else on those targets is
+  the real backend.
+- The Ktor server module is a scaffold and is unused.
 
-> **Note:** The demo video shows the real app and the real RevenueCat
-> sandbox purchase. The extraction step it demonstrates is deterministic
-> sample content, not a live model call.
+### How we know
+
+Three suites, all runnable against the live project rather than a mock:
+
+| Suite | Checks | Proves |
+| --- | --- | --- |
+| `tools/verify_rules.py` | 20 | Cross-user denial, server-only clinical fields, storage limits |
+| `tools/verify_pipeline.py` | 43 | The whole pipeline, both paywall gates, entitlement grant and revoke |
+| `functions/tests/test_pipeline.py` | 56 | Translation safety boundary, PDF, frequency lookup |
+
+The rules suite earned its keep immediately. It found that our brief-create
+rule could never have passed: it required `status == 'draft'` while also
+requiring the key `status` to be absent, and the Kotlin client serialises
+defaults, so every nullable field arrives as an explicit null. A test
+written from the rules would have agreed with the rules. Only a test built
+from the real client payload caught it.
 
 ## Challenges we ran into
 
@@ -201,6 +287,22 @@ Being precise about this matters more than the pitch does.
   accuracy. It was what the screen does when two documents disagree. Showing
   both and flagging the conflict took more UI work than picking one would
   have.
+- **A security rule that no client could satisfy.** Described above. The
+  general lesson: a test written from your rules will agree with your rules.
+  Build the payload the way the client actually builds it.
+- **Deleting the fallbacks was the risky part.** The repositories used to
+  swallow every failure and return mock data, so a permission error, an
+  offline device and an empty account were indistinguishable — from each
+  other and from success. Removing that turned silent wrong answers into
+  crashes until there was somewhere for failures to go, so the error banner
+  and `try/finally` on every long call had to land in the same change.
+- **Firebase on Desktop fails twice, late, and somewhere else.**
+  `Firebase.initialize(context = null)` is correct on Web and leaves the
+  JVM app uninitialised — which surfaces at the *first auth call* as
+  "Default FirebaseApp is not initialized". Passing a `Context` gets
+  further: auth succeeds, and Firestore then dies on its own async queue
+  because it casts to `android.app.Application`. Writing the integration
+  test before the implementation is the only reason both were found.
 
 ## Accomplishments we're proud of
 
@@ -209,7 +311,12 @@ Being precise about this matters more than the pitch does.
 - A paywall that reacts to entitlement state rather than to button taps, so
   it behaves correctly when a subscription changes somewhere else.
 - A clinical data model that treats "we don't know" as information worth
-  rendering.
+  rendering — and a test that proves the model honours it, by handing it a
+  dose it cannot read and checking that the field stays empty.
+- Both Pro gates enforced on the server. The clean export is not a flag the
+  client can set.
+- A pipeline that spends real money behind a daily per-user cap and a kill
+  switch that stops it in seconds without a deploy.
 
 ## What we learned
 
@@ -221,12 +328,16 @@ it can't confirm.
 
 ## What's next
 
-- Wire the extraction pipeline behind the existing schema, with the flagging
-  contract as an acceptance test rather than an afterthought.
 - Validate the brief format with clinicians in Valencia, as a student
-  research project.
-- Expand language coverage beyond English and Spanish.
-- Ship the QR handoff so a clinic can open a brief without an install.
+  research project. The question we want answered is not "is it accurate"
+  but "does the flagged-items section change what you ask the patient".
+- Expand language coverage beyond English and Spanish. The frequency lookup
+  table is per-language and the extraction prompt is language-agnostic, so
+  the work is mostly clinical review of the wording.
+- On-device classification, so the doc-type triage costs nothing and works
+  offline.
+- A clinic handoff that is safe by construction — the previous design was a
+  guessable URL, and we would rather ship nothing than ship that again.
 
 ## Award tracks
 
@@ -262,8 +373,7 @@ Requirements are an Android SDK matching the `android-compileSdk` value in
 `gradle/libs.versions.toml`, and Xcode with its license accepted for the iOS
 target.
 
-## Next steps
-
-- Record the demo using [the demo video beat sheet](./DEMO_VIDEO_BEAT_SHEET.md).
-- Confirm the sandbox purchase flow on a physical Android device and an iOS
-  simulator before recording.
+The backend deploys with `firebase deploy --only functions`, and
+[docs/PIPELINE_OPERATIONS.md](./PIPELINE_OPERATIONS.md) covers the parts that
+aren't obvious from the code: the region trade, the absence of any
+service-account key, the spend levers, and how to run the three suites.

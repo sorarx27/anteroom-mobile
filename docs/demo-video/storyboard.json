@@ -1,0 +1,203 @@
+wrote /Users/ahmedzayed/Downloads/Revenue cat/docs/demo-video/storyboard.json
+",
+    "slug": "anteroom-demo",
+    "duration_seconds": 91,
+    "aspect_ratio": "16:9",
+    "engine_hint": "ffmpeg",
+    "audience": "Ship-a-ton judges evaluating in under two minutes, plus clinicians.",
+    "intent": "The viewer should leave knowing Anteroom extracts a real clinical brief and flags what it cannot read instead of guessing."
+  },
+  "scenes": [
+    {
+      "id": "problem",
+      "duration": 9,
+      "intent": "Name the pain before showing any product.",
+      "shots": [
+        {
+          "id": "problem-1",
+          "duration": 5,
+          "visual": "The two real source documents side by side: a GP referral letter and a repeat prescription whose Warfarin dose is blurred and blotted.",
+          "text": "A 10-minute appointment. A folder of paper.",
+          "motion": "Both pages drift in slowly; the blotted dose cell is the last thing to settle.",
+          "voiceover": "In Spain the appointment is ten minutes and the paperwork is a folder."
+        },
+        {
+          "id": "problem-2",
+          "duration": 4,
+          "visual": "Same two pages; a red ring draws around the illegible Warfarin dose.",
+          "text": "Some of it is unreadable.",
+          "motion": "Ring draws on over 600ms, then holds.",
+          "voiceover": "Some of it is unreadable. A guessed dose is worse than none."
+        }
+      ]
+    },
+    {
+      "id": "hero",
+      "duration": 5,
+      "intent": "Cut to the product with one promise.",
+      "shots": [
+        {
+          "id": "hero-1",
+          "duration": 5,
+          "visual": "Anteroom dashboard on a real Android device, signed in.",
+          "text": "Anteroom turns the folder into one brief.",
+          "motion": "Hard cut from the paper. Phone settles into frame.",
+          "voiceover": "Anteroom turns that folder into one structured brief before the visit starts."
+        }
+      ]
+    },
+    {
+      "id": "capture",
+      "duration": 13,
+      "intent": "Show real capture, not a mock.",
+      "shots": [
+        {
+          "id": "capture-1",
+          "duration": 7,
+          "visual": "Screen recording: tap Snap paperwork, the capture screen opens, From gallery opens the Android photo picker.",
+          "text": "1 - Photograph the paperwork",
+          "motion": "Real-time screen recording, no speed change.",
+          "voiceover": "Photograph the paperwork, or pick it from the library."
+        },
+        {
+          "id": "capture-2",
+          "duration": 6,
+          "visual": "Both pages selected, Done tapped, the captured strip fills with two real thumbnails and the header reads 2 pages captured.",
+          "text": "Uploaded to your own account",
+          "motion": "Real-time. The thumbnail strip is the payoff of this shot.",
+          "voiceover": "They upload to your account, and you can see exactly what you captured."
+        }
+      ]
+    },
+    {
+      "id": "classify",
+      "duration": 7,
+      "intent": "Show the model doing its first, cheap job.",
+      "shots": [
+        {
+          "id": "classify-1",
+          "duration": 7,
+          "visual": "The review screen with the banner \"Detected: Referral - tap a chip to change\" and both page thumbnails rendered.",
+          "text": "2 - Anteroom types the document",
+          "motion": "Hold on the detected banner, then the chips.",
+          "voiceover": "Gemini Flash types the document. You can override it in one tap."
+        }
+      ]
+    },
+    {
+      "id": "generate",
+      "duration": 10,
+      "intent": "The real model call. Split in two so the trim is visible, not hidden.",
+      "shots": [
+        {
+          "id": "generate-1",
+          "duration": 5,
+          "visual": "Generate brief tapped; the processing dialog runs, reading \"This usually takes 5-10 seconds\".",
+          "text": "3 - One structured brief",
+          "motion": "Real-time.",
+          "voiceover": "Generate. Gemini 2.5 Pro reads both pages, in the EU."
+        },
+        {
+          "id": "generate-2",
+          "duration": 5,
+          "visual": "The finished brief appears. An on-screen label states that model time was trimmed.",
+          "text": "~28s of model time, trimmed",
+          "motion": "Hard cut, with the trim labelled on screen rather than sped up silently.",
+          "voiceover": "About half a minute later, the brief is there."
+        }
+      ]
+    },
+    {
+      "id": "flag",
+      "duration": 18,
+      "intent": "The payoff. The product refuses to guess.",
+      "shots": [
+        {
+          "id": "flag-1",
+          "duration": 7,
+          "visual": "Top of the brief: the red FLAGGED FOR CLINICAL REVIEW (1) banner reading \"Warfarin dose unreadable on page 2\".",
+          "text": "It flags what it cannot read",
+          "motion": "Hold. This is the frame the whole video exists for.",
+          "voiceover": "It found seven medications. And it refused to guess the eighth."
+        },
+        {
+          "id": "flag-2",
+          "duration": 6,
+          "visual": "Scrolled to the medication list: every drug shows dose and frequency, Warfarin shows \"as directed\" and no dose line at all.",
+          "text": "No dose. Not a guessed dose.",
+          "motion": "Slow scroll stops on the Warfarin row.",
+          "voiceover": "Every other drug has its dose, verbatim. Warfarin has none, because the page did not."
+        },
+        {
+          "id": "flag-3",
+          "duration": 5,
+          "visual": "Source documents strip, then the full-screen page inspector showing the original blotted prescription.",
+          "text": "Every line traces back to the page",
+          "motion": "Tap through to the inspector; hold on the smudged cell.",
+          "voiceover": "And the original page is one tap away, so any line can be checked."
+        }
+      ]
+    },
+    {
+      "id": "export",
+      "duration": 11,
+      "intent": "The paid feature, shown honestly.",
+      "shots": [
+        {
+          "id": "export-1",
+          "duration": 6,
+          "visual": "Download PDF (watermarked) tapped; the Android share sheet appears with anteroom-brief-*.pdf.",
+          "text": "4 - Hand your doctor a PDF",
+          "motion": "Real-time screen recording.",
+          "voiceover": "Export a PDF for the clinic. On the free tier the server watermarks it."
+        },
+        {
+          "id": "export-2",
+          "duration": 5,
+          "visual": "The two real PDFs side by side: the watermarked English free export and the clean Spanish Pro export.",
+          "text": "Pro: clean, and in Spanish",
+          "motion": "Free page fades to the Pro page; the watermark disappears and the labels turn Spanish.",
+          "voiceover": "Pro removes the watermark and renders it in Spanish. Doses are never translated."
+        }
+      ]
+    },
+    {
+      "id": "billing",
+      "duration": 10,
+      "intent": "RevenueCat, and why the gate is server-side.",
+      "shots": [
+        {
+          "id": "billing-1",
+          "duration": 5,
+          "visual": "The Anteroom Pro paywall on Android, showing the monthly and lifetime packages from the live offering.",
+          "text": "RevenueCat purchases-kmp",
+          "motion": "Paywall slides up. Hold on the packages.",
+          "voiceover": "Billing is RevenueCat's Kotlin Multiplatform SDK - one implementation, Play and StoreKit."
+        },
+        {
+          "id": "billing-2",
+          "duration": 5,
+          "visual": "Terminal frame: the pipeline suite printing \"translateBrief denied for free user :: PERMISSION_DENIED\" and \"Pro PDF is NOT watermarked :: False\".",
+          "text": "The gate is on the server, not the client",
+          "motion": "Lines print in sequence; the two verdict lines highlight.",
+          "voiceover": "A RevenueCat webhook writes the entitlement, and the server decides. The client cannot unlock itself."
+        }
+      ]
+    },
+    {
+      "id": "cta",
+      "duration": 8,
+      "intent": "Close on the claim that is actually defensible.",
+      "shots": [
+        {
+          "id": "cta-1",
+          "duration": 8,
+          "visual": "Anteroom wordmark over the flagged brief, with the four target names and the repository URL.",
+          "text": "Anteroom - it tells you what it could not read",
+          "motion": "Wordmark settles; subtitle and URL fade up.",
+          "voiceover": "Anteroom. Android, iOS, desktop and web, from one Kotlin codebase."
+        }
+      ]
+    }
+  ]
+}
