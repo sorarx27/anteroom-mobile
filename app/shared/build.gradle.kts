@@ -80,6 +80,17 @@ kotlin {
         }
         jvmMain.dependencies {
             implementation(libs.ktor.client.okhttp)
+            // Pulled in transitively by firebase-*-jvm, but referenced
+            // directly by FirebaseInit.jvm.kt (FirebasePlatform and the stub
+            // android.content.Context), so it has to be on the compile
+            // classpath rather than only the runtime one.
+            implementation("dev.gitlive:firebase-java-sdk:0.4.5")
+            // GitLive's JVM auth dispatches its callbacks onto
+            // Dispatchers.Main, which plain JVM does not provide -- the
+            // failure is an IllegalStateException on an OkHttp thread
+            // ("Module with the Main dispatcher is missing") that leaves the
+            // sign-in coroutine hanging rather than throwing to the caller.
+            implementation(libs.kotlinx.coroutinesSwing)
         }
         commonMain.dependencies {
             api(project(":core"))
