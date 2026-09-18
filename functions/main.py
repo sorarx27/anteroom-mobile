@@ -303,9 +303,20 @@ _GRANTING = {
     "PRODUCT_CHANGE",
     "SUBSCRIPTION_EXTENDED",
     "TEMPORARY_ENTITLEMENT_GRANT",
-    "TRANSFER",
 }
-_REVOKING = {"EXPIRATION", "SUBSCRIPTION_PAUSED", "REFUND"}
+_REVOKING = {"EXPIRATION", "SUBSCRIPTION_PAUSED"}
+
+# Two event types are deliberately in neither set.
+#
+# CANCELLATION means auto-renew was switched off, not that access ended: the
+# user keeps Pro until `expires_at` passes, and revoking here would take the
+# feature away from someone who has paid for the rest of the month. A refund
+# arrives as EXPIRATION with an expiration_reason, which _REVOKING catches.
+#
+# TRANSFER carries `transferred_from` / `transferred_to` rather than a single
+# `app_user_id`, so there is no one uid to write. It falls through to the
+# missing-uid branch and is skipped rather than guessed at. Worth revisiting
+# if account transfers ever become a real flow.
 
 
 @https_fn.on_request(
