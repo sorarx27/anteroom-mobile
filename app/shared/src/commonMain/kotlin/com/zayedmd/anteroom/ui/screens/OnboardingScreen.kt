@@ -44,7 +44,7 @@ private val SLIDES = listOf(
     ),
     OnboardingSlide(
         title = "Walk in doctor-ready.",
-        subtitle = "One clean page. Flags unreadable high-risk doses instead of guessing. Export a PDF with a clinic QR."
+        subtitle = "One clean page. Flags unreadable high-risk doses instead of guessing. Export a PDF to hand your doctor."
     )
 )
 

@@ -177,7 +177,7 @@ fun PaywallModal(
                         ProFeatureRow(
                             icon = "📄",
                             title = "Clean doctor export",
-                            desc = "Download watermark-free PDFs and generate clinic QR codes."
+                            desc = "Download a clean, watermark-free PDF to hand your doctor."
                         )
                         HorizontalDivider(color = AnteroomColors.Border)
                         ProFeatureRow(

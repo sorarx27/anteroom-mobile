@@ -215,12 +215,6 @@ fun BriefViewScreen(
                 // Allergies List
                 AllergiesListCard(allergies = activeContent?.allergies ?: emptyList())
 
-                // Clinic QR Card
-                ClinicQrCard(
-                    shareUrlPath = currentBrief.share_url_path,
-                    onOpenLink = onOpenShareLink
-                )
-
                 // Original Source Photos
                 OriginalPhotosSection(
                     photos = photos,
