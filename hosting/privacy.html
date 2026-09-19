@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Anteroom</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header><a class="wordmark" href="/">Anteroom</a></header>
+<main>
+
+<h1>Privacy Policy</h1>
+<p class="updated">Last updated 19 September 2026</p>
+<p class="lede">Anteroom turns photographs of your medical paperwork into a
+structured brief you can hand to a doctor. That means the app handles health
+information, so this policy is specific about what is collected, where it goes,
+and how to erase it.</p>
+
+<div class="callout">
+<strong>The short version.</strong> Your documents and briefs are stored in your
+own account in the European Union and are not shared with anyone. There are no
+analytics SDKs, no advertising SDKs and no trackers in the app. You can delete
+your account and everything in it from inside the app, and the deletion is
+immediate and permanent.
+</div>
+
+<h2>Who is responsible</h2>
+<p>Anteroom is operated by Dr. Ahmed Zayed ("we", "us"). For data protection
+purposes we are the controller of the information described below. You can
+reach us at <a href="mailto:support@anteroom.app">support@anteroom.app</a>.</p>
+
+<h2>What the app collects</h2>
+<table>
+<tr><th>Category</th><th>What it is</th><th>Why</th></tr>
+<tr>
+  <td>Account</td>
+  <td>Email address and password, and the display name, date of birth, language
+      and country you optionally enter during setup. Passwords are handled by
+      Firebase Authentication and are never visible to us.</td>
+  <td>To sign you in and keep your briefs attached to you and nobody else.</td>
+</tr>
+<tr>
+  <td>Profiles</td>
+  <td>For yourself and anyone you add: a name, a relationship, and optionally a
+      date of birth and biological sex.</td>
+  <td>So a brief says whose paperwork it is, and so the brief can note age- and
+      sex-relevant context.</td>
+</tr>
+<tr>
+  <td>Documents</td>
+  <td>The photographs of medical paperwork you choose to add — referrals,
+      prescriptions, medication lists, discharge summaries, lab results.</td>
+  <td>These are the input. Nothing is captured in the background; a page is
+      uploaded only when you add it to a brief.</td>
+</tr>
+<tr>
+  <td>Briefs</td>
+  <td>The structured text derived from those photographs: conditions,
+      medications and dosages, allergies, questions for the doctor, and items
+      flagged as unreadable or needing confirmation.</td>
+  <td>This is the output you came for.</td>
+</tr>
+<tr>
+  <td>Subscription state</td>
+  <td>Whether the Anteroom Pro entitlement is active, the product identifier,
+      the store, and the expiry date.</td>
+  <td>To unlock Pro features. We never receive your card details — the App
+      Store or Google Play handles payment.</td>
+</tr>
+</table>
+
+<h3>What the app does not collect</h3>
+<ul>
+  <li>No analytics, advertising, attribution or crash-reporting SDKs are
+      included in the app.</li>
+  <li>No advertising identifier, no location, no contacts, no device
+      fingerprint.</li>
+  <li>No access to your photo library beyond the individual images you pick.
+      On iOS the picker runs outside the app, so the app never sees the rest
+      of your library.</li>
+</ul>
+
+<h2>Where it is stored</h2>
+<p>Everything is stored in Google Firebase and Google Cloud under our project.
+The database is in Google's <code>eur3</code> multi-region and the page images
+and server-side functions are in <code>europe-west1</code> (Belgium). Data is
+encrypted in transit and at rest by Google Cloud.</p>
+
+<h2>How documents are processed</h2>
+<p>To produce a brief, the pages you added are sent to Google's Vertex AI
+(Gemini models) running in <code>europe-west1</code> and are processed to
+extract the text into a structured form. Google acts as our processor for this
+and, under the
+<a href="https://cloud.google.com/terms/service-terms">Google Cloud Service
+Specific Terms</a>, does not use this content to train its models.</p>
+<p>The same route is used for the two other model-backed features: classifying
+what kind of document a page is, and translating a completed brief between
+English and Spanish.</p>
+<p>Translation is deliberately constrained. Drug names, numeric doses and units
+are copied across unchanged rather than re-generated, so a translation cannot
+introduce a dose that was not in the original document.</p>
+
+<h2>Who else sees it</h2>
+<ul>
+  <li><strong>Google (Firebase, Cloud Storage, Cloud Functions, Vertex AI)</strong>
+      — our infrastructure and processing provider.</li>
+  <li><strong>RevenueCat</strong> — manages subscription state. It receives your
+      Firebase user ID and the purchase details from the store. It does not
+      receive your documents, your briefs or your email address.</li>
+  <li><strong>Apple and Google</strong> — process the payment itself under their
+      own privacy policies.</li>
+</ul>
+<p>We do not sell personal data, and we do not share it with advertisers or data
+brokers. We will disclose data if we are legally required to, and we will tell
+you unless we are prohibited from doing so.</p>
+
+<h2>How long it is kept</h2>
+<p>Briefs and page images stay in your account until you delete them or delete
+your account. We do not expire them on a schedule, because the point of the app
+is that last year's discharge summary is still there when you need it.</p>
+
+<h2>Deleting your account</h2>
+<p>Open the app, scroll to the bottom of the home screen and tap
+<strong>Delete account</strong>. Confirming erases, permanently:</p>
+<ul>
+  <li>every brief and all of its extracted content;</li>
+  <li>every page image you uploaded;</li>
+  <li>every profile, including your own;</li>
+  <li>your subscription entitlement record and usage counters;</li>
+  <li>your sign-in credential.</li>
+</ul>
+<p>There is no recovery period and no copy kept for support purposes. Deleting
+your account does not cancel a subscription — that is billed by Apple or Google
+and has to be cancelled in your store account.</p>
+
+<h2>Your rights</h2>
+<p>If you are in the European Economic Area or the United Kingdom, the GDPR
+gives you the right to access, correct, export, restrict, object to, and erase
+your personal data. Deletion is built into the app; for anything else, write to
+<a href="mailto:support@anteroom.app">support@anteroom.app</a> and we
+will respond within 30 days. You also have the right to complain to your
+national data protection authority.</p>
+<p>Our legal basis for processing your account data is performance of the
+contract between us. Health information in your documents is processed on the
+basis of your explicit consent, given when you add a page to a brief; you can
+withdraw it by deleting the brief or your account.</p>
+
+<h2>Children</h2>
+<p>Anteroom is not directed at children and we do not knowingly create accounts
+for anyone under 16. An adult account holder may add a child as a profile — for
+example to keep a paediatric referral — in which case the adult is the one
+providing that information and is responsible for it.</p>
+
+<h2>Changes to this policy</h2>
+<p>If we change this policy in a way that affects how your data is used, we will
+update the date at the top and describe the change in the app before it takes
+effect.</p>
+
+</main>
+<footer>
+<a href="/">Anteroom</a>
+<a href="/privacy">Privacy</a>
+<a href="/terms">Terms</a>
+<a href="/support">Support</a>
+</footer>
+</body>
+</html>

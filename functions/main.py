@@ -22,7 +22,7 @@ import hmac
 import json
 import logging
 
-from firebase_admin import initialize_app
+from firebase_admin import auth as admin_auth, initialize_app
 from firebase_functions import https_fn, options
 from firebase_functions.params import SecretParam
 
@@ -400,6 +400,39 @@ def revenuecatWebhook(req: https_fn.Request) -> https_fn.Response:
     store.db().document(f"users/{uid}/billing/entitlement").set(document, merge=True)
     logger.info("RevenueCat %s for %s -> active=%s", event_type, uid, active)
     return https_fn.Response(json.dumps({"ok": True}), status=200, mimetype="application/json")
+
+
+# ---------------------------------------------------------------------------
+# deleteAccount
+# ---------------------------------------------------------------------------
+@https_fn.on_call(
+    region=REGION,
+    memory=options.MemoryOption.MB_512,
+    timeout_sec=300,
+    max_instances=5,
+)
+def deleteAccount(req: https_fn.CallableRequest) -> dict:
+    """Erase the caller's account and everything in it. Irreversible.
+
+    Required by App Store Review Guideline 5.1.1(v): an app that lets you
+    create an account must let you delete it from inside the app, and a support
+    email does not satisfy it.
+
+    There is no `uid` parameter, deliberately. The only account this can delete
+    is the one holding the ID token, so there is nothing to authorize beyond
+    being signed in and no way to aim it at somebody else.
+
+    Data goes first and the credential goes last -- see `store.purge_user`.
+    """
+    uid = store.require_uid(req)
+    counts = store.purge_user(uid)
+
+    # Last, and only once the data is gone. `delete_user` invalidates the
+    # refresh token, so the client's next Firestore call would fail anyway.
+    admin_auth.delete_user(uid)
+    logger.info("Deleted account %s", uid)
+
+    return {"ok": True, "deleted": counts}
 
 
 # ---------------------------------------------------------------------------

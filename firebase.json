@@ -39,5 +39,26 @@
   },
   "storage": {
     "rules": "storage.rules"
+  },
+  "hosting": {
+    "public": "hosting",
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(css|html)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=600"
+          }
+        ]
+      }
+    ]
   }
 }

@@ -3,6 +3,7 @@ package com.zayedmd.anteroom.auth
 import com.zayedmd.anteroom.model.AppUser
 import com.zayedmd.anteroom.data.ProfilesRepository
 import com.zayedmd.anteroom.data.ProfilesRepositoryImpl
+import com.zayedmd.anteroom.data.requireUid
 import com.zayedmd.anteroom.firebase.FirebaseService
 import dev.gitlive.firebase.auth.FirebaseUser
 import dev.gitlive.firebase.auth.GoogleAuthProvider
@@ -12,6 +13,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.Serializable
 
 class AuthServiceImpl(
     private val tokenStorage: TokenStorage = TokenStorage(),
@@ -151,6 +154,20 @@ class AuthServiceImpl(
         _user.value = updated
     }
 
+    override suspend fun deleteAccount() {
+        requireUid()
+        // 300s to match the function: an account with six-page briefs can be a
+        // few hundred Storage objects, and the default 70s callable timeout
+        // would report failure over a purge that is still running.
+        FirebaseService.functions
+            .httpsCallable("deleteAccount", timeout = 300.seconds)
+            .invoke(DeleteAccountRequest.serializer(), DeleteAccountRequest())
+
+        // Only after the server confirms. Signing out first would drop the ID
+        // token the callable authenticates with.
+        signOut()
+    }
+
     override suspend fun signOut() {
         try {
             FirebaseService.auth.signOut()
@@ -160,3 +177,11 @@ class AuthServiceImpl(
         _status.value = AuthStatus.Unauthenticated
     }
 }
+
+/**
+ * The `deleteAccount` callable takes no arguments — the uid comes from the ID
+ * token, so there is nothing for a caller to supply or to get wrong. This
+ * exists only because the payload still has to serialise to *something*.
+ */
+@Serializable
+private class DeleteAccountRequest

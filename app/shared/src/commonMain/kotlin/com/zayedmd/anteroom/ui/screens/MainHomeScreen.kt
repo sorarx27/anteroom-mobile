@@ -8,8 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import com.zayedmd.anteroom.auth.AuthService
 import com.zayedmd.anteroom.model.AppUser
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
+import com.zayedmd.anteroom.ui.userMessage
 import kotlinx.coroutines.launch
 
 @Composable
@@ -29,6 +29,9 @@ fun MainHomeScreen(
 ) {
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    var confirmingDelete by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf(false) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
 
     Box(
         modifier = Modifier
@@ -212,6 +215,84 @@ fun MainHomeScreen(
                     fontWeight = FontWeight.SemiBold
                 )
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Account deletion. Plain text rather than a second red button:
+            // it has to be findable without being adjacent enough to Sign out
+            // to be hit by mistake. App Store Review Guideline 5.1.1(v)
+            // requires it to be here at all -- pointing at a support email
+            // does not satisfy it.
+            TextButton(
+                onClick = { deleteError = null; confirmingDelete = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Delete account",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = AnteroomColors.Muted
+                )
+            }
+
+            if (deleteError != null) {
+                Text(
+                    text = deleteError!!,
+                    fontSize = 12.sp,
+                    color = AnteroomColors.Error,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    if (confirmingDelete) {
+        AlertDialog(
+            onDismissRequest = { if (!deleting) confirmingDelete = false },
+            title = { Text("Delete your account?") },
+            text = {
+                Text(
+                    "This erases your account, every brief, every page you photographed, " +
+                        "and your family profiles. It cannot be undone and it cannot be " +
+                        "recovered by support.\n\n" +
+                        "An active subscription is billed by the App Store or Google Play, " +
+                        "not by Anteroom. Cancel it in your store account — deleting here " +
+                        "does not stop it."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !deleting,
+                    onClick = {
+                        deleting = true
+                        deleteError = null
+                        scope.launch {
+                            try {
+                                authService.deleteAccount()
+                                // No state reset on success: deleteAccount signs
+                                // out, and this whole screen leaves the tree.
+                            } catch (e: Throwable) {
+                                deleteError = e.userMessage()
+                                deleting = false
+                                confirmingDelete = false
+                            }
+                        }
+                    }
+                ) {
+                    Text(
+                        text = if (deleting) "Deleting…" else "Delete permanently",
+                        color = AnteroomColors.Error,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(enabled = !deleting, onClick = { confirmingDelete = false }) {
+                    Text("Keep my account")
+                }
+            }
+        )
     }
 }

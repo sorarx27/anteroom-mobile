@@ -4,6 +4,12 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<!-- The app uses only HTTPS and the platform's own TLS, which is exempt
+	     under the US export regulations. Declaring it here stops App Store
+	     Connect asking the export-compliance question on every single upload,
+	     which is otherwise a manual gate between an archive and TestFlight. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<!-- Required. Presenting UIImagePickerController with the camera source
 	     without this key terminates the app with SIGABRT before anything is
 	     drawn. The gallery path uses PHPickerViewController, which runs out of

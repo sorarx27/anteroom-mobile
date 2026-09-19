@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -23,6 +24,7 @@ import com.zayedmd.anteroom.subscription.AnteroomPurchases
 import com.zayedmd.anteroom.subscription.RevenueCatConfig
 import com.zayedmd.anteroom.subscription.RevenueCatService
 import com.zayedmd.anteroom.subscription.SubscriptionPackage
+import com.zayedmd.anteroom.ui.LegalLinks
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
 import kotlinx.coroutines.launch
 
@@ -34,6 +36,7 @@ fun PaywallModal(
     revenueCatService: RevenueCatService = AnteroomPurchases.service
 ) {
     val scope = rememberCoroutineScope()
+    val uriHandler = LocalUriHandler.current
     val offering by revenueCatService.activeOffering.collectAsState()
     val isProcessing by revenueCatService.isProcessing.collectAsState()
     val lastError by revenueCatService.lastError.collectAsState()
@@ -346,6 +349,55 @@ fun PaywallModal(
                                 fontSize = 12.sp,
                                 color = AnteroomColors.Muted,
                                 fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        // Renewal terms and the two legal links. App Store
+                        // Review Guideline 3.1.2 requires both links to be in
+                        // the binary and next to the purchase, and checks it
+                        // mechanically -- an app that only lists them on its
+                        // store page is rejected. Google Play asks for the
+                        // same disclosure.
+                        Text(
+                            text = "Monthly renews automatically until cancelled. " +
+                                "Cancel any time in your store account. " +
+                                "Lifetime is a single payment.",
+                            fontSize = 10.sp,
+                            lineHeight = 14.sp,
+                            color = AnteroomColors.Muted,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Terms of Use",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = AnteroomColors.BrandPrimary,
+                                modifier = Modifier
+                                    .clickable { uriHandler.openUri(LegalLinks.TERMS) }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                            Text(
+                                text = "·",
+                                fontSize = 11.sp,
+                                color = AnteroomColors.Muted
+                            )
+                            Text(
+                                text = "Privacy Policy",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = AnteroomColors.BrandPrimary,
+                                modifier = Modifier
+                                    .clickable { uriHandler.openUri(LegalLinks.PRIVACY) }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
                     }

@@ -266,3 +266,50 @@ def _downscale_jpeg(Image, raw: bytes) -> bytes:
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="JPEG", quality=IMAGE_JPEG_QUALITY, optimize=True)
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# Account deletion
+# ---------------------------------------------------------------------------
+def purge_user(uid: str) -> dict[str, int]:
+    """Delete everything belonging to `uid`, except the Auth record itself.
+
+    App Store Review Guideline 5.1.1(v) requires an app that creates accounts
+    to delete them from inside the app. A client cannot do this job properly:
+    it can delete its own Firestore documents, but Storage objects under
+    another prefix, the entitlement document and the usage counters are all
+    denied to it by rules -- by design, since those are exactly the documents a
+    client must not be able to forge.
+
+    The Auth record is deliberately *not* deleted here; the caller does that
+    last. If this raises halfway through, the account still exists and the user
+    can retry. Deleting the credential first would leave orphaned medical
+    images behind a uid nobody can authenticate as -- unreachable by the
+    person they belong to, and still on disk.
+    """
+    counts = {"briefs": 0, "files": 0, "documents": 0}
+    client = db()
+
+    for snap in client.collection("briefs").where("user_id", "==", uid).stream():
+        snap.reference.delete()
+        counts["briefs"] += 1
+
+    # `users/{uid}` holds profiles, billing and usage as subcollections.
+    # `collections()` is listed rather than hard-coded so a subcollection added
+    # later cannot quietly survive a deletion request.
+    user_ref = client.collection("users").document(uid)
+    for collection in user_ref.collections():
+        for snap in collection.stream():
+            snap.reference.delete()
+            counts["documents"] += 1
+    user_ref.delete()
+    counts["documents"] += 1
+
+    # Page images. The prefix is the uid, so this cannot reach another account
+    # even if a path were somehow malformed.
+    for blob in bucket().list_blobs(prefix=f"users/{uid}/"):
+        blob.delete()
+        counts["files"] += 1
+
+    logger.info("Purged account %s: %s", uid, counts)
+    return counts
