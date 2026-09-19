@@ -8,7 +8,7 @@ in English or Spanish, as a PDF, from a phone, a laptop or a browser.
 
 One Kotlin Multiplatform codebase. Android, iOS, Desktop and Web, with a 100%
 Compose Multiplatform UI and no per-platform screens. Billing is RevenueCat
-`purchases-kmp`: one implementation, two stores.
+`purchases-kmp` — one implementation, live on iOS through StoreKit.
 
 > Built for the RevenueCat Ship-a-ton. Build 1.0 (2) is on TestFlight,
 > in Apple's Beta App Review.
@@ -103,10 +103,18 @@ A client that could ask for a clean export *would be* the paywall.
 
 `expect fun createRevenueCatService()` picks the implementation per target. The
 store-backed one lives in `src/mobileMain/kotlin`, compiled into both
-`androidMain` and `iosMain` — one implementation, Google Play and StoreKit, no
-platform branches in the calling code. Desktop and Web get a simulated service
-that keeps the paywall navigable and reports `isSimulated = true`, so the UI
-says out loud that no charge occurred.
+`androidMain` and `iosMain` — one implementation, StoreKit and Google Play
+Billing, no platform branches in the calling code. Desktop and Web get a
+simulated service that keeps the paywall navigable and reports
+`isSimulated = true`, so the UI says out loud that no charge occurred.
+
+Purchases are **live on iOS** via StoreKit, on the TestFlight build. Android
+runs the identical code and installs as an APK built from this repo, but its
+Play products are not registered yet — a new Play Console account must complete a 14-day,
+20-tester closed test before publishing, which does not fit this hackathon.
+The paywall degrades honestly in the meantime: the SDK returns
+`ConfigurationError`, the user sees one sentence, and the developer diagnostic
+goes to the log.
 
 The paywall reacts to entitlement state rather than to button taps, so it
 behaves correctly when a subscription changes on another device.

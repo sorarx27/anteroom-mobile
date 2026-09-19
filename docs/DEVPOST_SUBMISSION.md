@@ -3,7 +3,8 @@
 Anteroom turns the pile of paper a patient carries into a doctor's office
 into one structured, bilingual clinical brief. It's a Kotlin Multiplatform
 app with a 100% Compose Multiplatform UI on iOS and Android, monetized end
-to end with the official RevenueCat `purchases-kmp` SDK.
+to end with the official RevenueCat `purchases-kmp` SDK — live on iOS through
+StoreKit, and running the same billing code on Android.
 
 This document is the working copy of the RevenueCat Ship-a-ton 2026
 submission. It covers the problem, the build, exactly what runs today, and
@@ -144,8 +145,23 @@ under `app/shared/src`:
   target.
 - The store-backed `RevenueCatServiceImpl` lives in `src/mobileMain/kotlin`,
   which is compiled into both `androidMain` and `iosMain`. One
-  implementation, two stores, zero duplication — Google Play billing and
-  StoreKit run the same Kotlin.
+  implementation, zero duplication: the same Kotlin runs against StoreKit on
+  iOS and Google Play Billing on Android, with no platform branches in the
+  calling code.
+- **What is live today:** in-app purchases are active on **iOS**, through
+  StoreKit, on the TestFlight build. The monthly and lifetime products exist
+  in App Store Connect and the paywall resolves their prices from the store
+  at runtime.
+- **Android** runs the identical code from the identical source set and
+  installs as an APK built from this repo with
+  `./gradlew :app:androidApp:assembleDebug`. Its Play Store products are not
+  registered yet, so purchases cannot complete there. A new Google Play
+  Console account has to run a 14-day closed test with 20 testers before it
+  can publish, which does not fit inside this hackathon — so Play
+  registration is scheduled for after the beta rather than rushed. The app
+  handles the unconfigured state rather than leaking it: the RevenueCat SDK
+  returns `ConfigurationError`, and the paywall shows one sentence, falls back
+  to the catalogue price, and logs the diagnostic.
 - Desktop and Web get `SimulatedRevenueCatService`, which keeps the paywall
   navigable on a laptop and reports `isSimulated = true` so the UI says out
   loud that no charge occurred.
@@ -229,7 +245,8 @@ Being precise about this matters more than the pitch does.
   Web.
 - RevenueCat billing through `purchases-kmp`: offerings fetch, package
   purchase, restore, customer info refresh, and delegate-driven entitlement
-  updates, all verified against `anteroom_pro`.
+  updates, all verified against `anteroom_pro`. Purchases complete **on iOS**,
+  through StoreKit, on the TestFlight build.
 - Firebase authentication, Firestore persistence, and Storage photo upload —
   including on Desktop, which uploads over the Storage REST API because
   GitLive ships no JVM implementation.
@@ -243,6 +260,14 @@ Being precise about this matters more than the pitch does.
 
 **Honest limits:**
 
+- **Android purchases do not complete yet.** The Play products are not
+  registered, so the store returns no offering and the paywall falls back to
+  the catalogue price with a plain "Plans aren't available on this device
+  right now." A new Google Play Console account must run a 14-day closed test
+  with 20 testers before it can publish, which cannot finish before the
+  deadline — so Android ships as a direct APK this cycle and Play
+  registration follows. The billing code itself is the same source set that
+  is live on iOS; what is missing is a store listing, not an implementation.
 - Two languages, English and Spanish.
 - Six pages per brief. The cap is the spend ceiling as much as a product
   limit, and it is enforced in the security rules, not just the client.
@@ -307,8 +332,10 @@ from the real client payload caught it.
 
 ## Accomplishments we're proud of
 
-- One `RevenueCatService` implementation drives billing on both Google Play
-  and StoreKit, with no platform branches in the calling code.
+- One `RevenueCatService` implementation drives billing on iOS and Android
+  with no platform branches in the calling code — live against StoreKit
+  today, and pointed at Google Play Billing by the same source set the moment
+  the Play products exist.
 - A paywall that reacts to entitlement state rather than to button taps, so
   it behaves correctly when a subscription changes somewhere else.
 - A clinical data model that treats "we don't know" as information worth
@@ -335,6 +362,9 @@ it can't confirm.
 - Expand language coverage beyond English and Spanish. The frequency lookup
   table is per-language and the extraction prompt is language-agnostic, so
   the work is mostly clinical review of the wording.
+- Google Play registration, then the 14-day closed test, then Play Billing
+  live against the same `RevenueCatServiceImpl` that already runs on
+  StoreKit.
 - On-device classification, so the doc-type triage costs nothing and works
   offline.
 - A clinic handoff that is safe by construction — the previous design was a
