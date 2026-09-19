@@ -10,8 +10,9 @@ One Kotlin Multiplatform codebase. Android, iOS, Desktop and Web, with a 100%
 Compose Multiplatform UI and no per-platform screens. Billing is RevenueCat
 `purchases-kmp` — one implementation, live on iOS through StoreKit.
 
-> Built for the RevenueCat Ship-a-ton. Build 1.0 (2) is on TestFlight,
-> in Apple's Beta App Review.
+> Built for the RevenueCat Ship-a-ton.
+> **[Install the iOS beta on TestFlight](https://testflight.apple.com/join/EvbxqXGU)** — build 1.0 (2),
+> approved by Apple and open to external testers.
 
 <p align="center">
   <img src="docs/assets/android-brief-flagged-dosage.png" width="30%" alt="A clinical brief with an unreadable dose flagged for confirmation">
@@ -108,7 +109,8 @@ Billing, no platform branches in the calling code. Desktop and Web get a
 simulated service that keeps the paywall navigable and reports
 `isSimulated = true`, so the UI says out loud that no charge occurred.
 
-Purchases are **live on iOS** via StoreKit, on the TestFlight build. Android
+Purchases are **live on iOS** via StoreKit, on the
+[public TestFlight build](https://testflight.apple.com/join/EvbxqXGU). Android
 runs the identical code and installs as an APK built from this repo, but its
 Play products are not registered yet — a new Play Console account must complete a 14-day,
 20-tester closed test before publishing, which does not fit this hackathon.

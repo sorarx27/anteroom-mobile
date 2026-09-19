@@ -149,9 +149,10 @@ under `app/shared/src`:
   iOS and Google Play Billing on Android, with no platform branches in the
   calling code.
 - **What is live today:** in-app purchases are active on **iOS**, through
-  StoreKit, on the TestFlight build. The monthly and lifetime products exist
-  in App Store Connect and the paywall resolves their prices from the store
-  at runtime.
+  StoreKit, on a public TestFlight build that anyone can install:
+  <https://testflight.apple.com/join/EvbxqXGU>. The monthly and lifetime
+  products exist in App Store Connect and the paywall resolves their prices
+  from the store at runtime.
 - **Android** runs the identical code from the identical source set and
   installs as an APK built from this repo with
   `./gradlew :app:androidApp:assembleDebug`. Its Play Store products are not
@@ -246,7 +247,8 @@ Being precise about this matters more than the pitch does.
 - RevenueCat billing through `purchases-kmp`: offerings fetch, package
   purchase, restore, customer info refresh, and delegate-driven entitlement
   updates, all verified against `anteroom_pro`. Purchases complete **on iOS**,
-  through StoreKit, on the TestFlight build.
+  through StoreKit, on a TestFlight build Apple has approved for external
+  testers: <https://testflight.apple.com/join/EvbxqXGU>
 - Firebase authentication, Firestore persistence, and Storage photo upload —
   including on Desktop, which uploads over the Storage REST API because
   GitLive ships no JVM implementation.
