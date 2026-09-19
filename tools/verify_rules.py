@@ -14,8 +14,10 @@ ever satisfy; only a test built from the real payload catches that.
 
 This deliberately talks to the deployed project rather than the emulator, so
 what it proves is what is actually enforced in production. It creates a
-throwaway second account each run to test cross-user denial, and leaves a
-couple of rulescheck_* briefs behind under the test user.
+throwaway second account each run to test cross-user denial, and cleans both
+that account and its own rulescheck_* brief up afterwards -- the test user is
+also the App Review demo account, and an empty draft named `rulescheck_...`
+sitting on the reviewer's dashboard is not what this script is for.
 
 The API key below is the Firebase Web API key, which is public by design --
 it identifies the project and grants nothing on its own. Security rules are
@@ -67,6 +69,15 @@ def get(url, token):
         try: body = json.loads(body)
         except Exception: pass
         return e.code, body
+
+def delete(url, token):
+    req = urllib.request.Request(url, method="DELETE")
+    req.add_header("Authorization", "Bearer " + token)
+    try:
+        with urllib.request.urlopen(req, timeout=40) as r:
+            return r.status, {}
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode()[:120]
 
 def signin(email, password):
     url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={API_KEY}"
@@ -252,6 +263,20 @@ obj = urllib.parse.quote(f"users/{uid}/briefs/{BRIEF}/exports/brief.pdf", safe="
 url = f"https://firebasestorage.googleapis.com/v0/b/{BUCKET}/o?uploadType=media&name={obj}"
 st, body = post(url, None, tok, raw=b"%PDF-1.4", ctype="application/pdf")
 check("client write to exports denied", st in (401, 403), err(body))
+
+# --- cleanup -----------------------------------------------------------
+# Runs whether or not the checks passed. The demo account is the one App
+# Review signs into, so anything this script creates has to go again.
+delete(f"{FS}/briefs/{BRIEF}", tok)
+for name in ("photo_ruleschecka1.jpg",):
+    obj = urllib.parse.quote(f"users/{uid}/briefs/{BRIEF}/pages/{name}", safe="")
+    delete(f"https://firebasestorage.googleapis.com/v0/b/{BUCKET}/o/{obj}", tok)
+# The throwaway account, via the same callable the app's Delete account uses.
+post("https://europe-west1-anteroom-d2e72.cloudfunctions.net/deleteAccount",
+     {"data": {}}, tokB)
+
+st, _ = get(f"{FS}/briefs/{BRIEF}", tok)
+check("script cleaned up after itself", st in (403, 404), f"HTTP {st}")
 
 print()
 bad = [n for n, ok, _ in results if not ok]
