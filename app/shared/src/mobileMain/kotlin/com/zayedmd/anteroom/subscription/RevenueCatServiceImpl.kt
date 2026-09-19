@@ -7,6 +7,7 @@ import com.revenuecat.purchases.kmp.configure
 import com.revenuecat.purchases.kmp.models.CustomerInfo
 import com.revenuecat.purchases.kmp.models.Offering
 import com.revenuecat.purchases.kmp.models.PurchasesError
+import com.revenuecat.purchases.kmp.models.PurchasesErrorCode
 import com.revenuecat.purchases.kmp.models.PurchasesException
 import com.revenuecat.purchases.kmp.models.PurchasesTransactionException
 import com.revenuecat.purchases.kmp.models.StoreProduct
@@ -254,8 +255,63 @@ class RevenueCatServiceImpl : RevenueCatService {
     }
 }
 
-private fun PurchasesError.readableMessage(): String =
-    underlyingErrorMessage?.takeIf { it.isNotBlank() } ?: message
+/**
+ * What the paywall shows the user.
+ *
+ * Deliberately not `underlyingErrorMessage`, which this used to prefer.
+ * That field is RevenueCat's developer diagnostic, and on a build whose store
+ * products are not registered yet it rendered six lines about the dashboard —
+ * two URLs included — in red, inside the purchase sheet, where a customer or
+ * an App Review screenshot would see it.
+ *
+ * The diagnostic is still worth having, so it goes to the log. The enum is the
+ * stable thing to branch on; `message` is the fallback because RevenueCat
+ * writes it for humans, unlike the underlying error.
+ */
+private fun PurchasesError.readableMessage(): String {
+    underlyingErrorMessage?.takeIf { it.isNotBlank() }?.let {
+        println("RevenueCat $code: $it")
+    }
+    return when (code) {
+        PurchasesErrorCode.NetworkError,
+        PurchasesErrorCode.OfflineConnectionError ->
+            "Couldn't reach the store. Check your connection and try again."
+
+        PurchasesErrorCode.StoreProblemError,
+        PurchasesErrorCode.UnknownBackendError,
+        PurchasesErrorCode.UnexpectedBackendResponseError ->
+            "The store is having trouble right now. Try again in a moment."
+
+        // ConfigurationError is the one behind the wall of red text: it is what
+        // the SDK returns when the offering has no products on this store.
+        PurchasesErrorCode.ConfigurationError,
+        PurchasesErrorCode.ProductNotAvailableForPurchaseError,
+        PurchasesErrorCode.UnsupportedError ->
+            "Plans aren't available on this device right now."
+
+        PurchasesErrorCode.PurchaseNotAllowedError,
+        PurchasesErrorCode.InsufficientPermissionsError ->
+            "This device isn't allowed to make purchases."
+
+        PurchasesErrorCode.PurchaseInvalidError,
+        PurchasesErrorCode.InvalidReceiptError ->
+            "The store couldn't complete that purchase. Try again, or use another payment method."
+
+        PurchasesErrorCode.ProductAlreadyPurchasedError ->
+            "You already own this. Tap Restore purchases."
+
+        PurchasesErrorCode.ReceiptAlreadyInUseError,
+        PurchasesErrorCode.ReceiptInUseByOtherSubscriberError,
+        PurchasesErrorCode.PurchaseBelongsToOtherUser ->
+            "That purchase belongs to another account. Sign in with the account that bought it."
+
+        PurchasesErrorCode.PaymentPendingError ->
+            "The payment is still pending. Anteroom Pro unlocks as soon as it clears."
+
+        else -> message.takeIf { it.isNotBlank() }
+            ?: "Something went wrong talking to the store."
+    }
+}
 
 private fun Throwable.readableMessage(): String = when (this) {
     is PurchasesException -> error.readableMessage()

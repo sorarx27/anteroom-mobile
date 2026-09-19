@@ -32,7 +32,14 @@ val AnteroomShapes = Shapes(
     small = RoundedCornerShape(6.dp),
     medium = RoundedCornerShape(12.dp),
     large = RoundedCornerShape(20.dp),
-    extraLarge = RoundedCornerShape(999.dp)
+    // 28.dp, the Material 3 default, not the 999.dp pill this used to be.
+    // Nothing in the app reads `extraLarge` directly -- the pill-shaped
+    // buttons all pass RoundedCornerShape(999.dp) themselves -- but Material's
+    // AlertDialog and ModalBottomSheet both default to this token, and a
+    // 999.dp radius on a dialog-sized surface clamps to half the short edge
+    // and draws an ellipse. Every confirmation dialog in the app was rendering
+    // as an oval with its title and buttons clipped off at the sides.
+    extraLarge = RoundedCornerShape(28.dp)
 )
 
 private val LightColorScheme = lightColorScheme(

@@ -52,12 +52,17 @@ fastest way to see it.
 > confirm, rather than inferring a plausible one; the brief screen carries a
 > standing reminder to check the output against the original document.
 >
-> Account deletion is on the home screen, below Sign out. It is immediate and
+> To find account deletion: tap the round avatar at the top right of the
+> dashboard (it shows the account's initials), then Delete account, then
+> Delete permanently in the confirmation dialog. It is immediate and
 > permanent, and it erases the briefs, the page images, the profiles, the
-> subscription record and the sign-in credential.
+> subscription record and the sign-in credential. Please use a throwaway
+> account rather than the demo one if you intend to complete it.
 >
-> Terms of Use and Privacy Policy are linked at the bottom of the purchase
-> screen, beneath Restore purchases.
+> To find the legal links: tap Upgrade, then scroll to the bottom of the
+> purchase screen. Terms of Use and Privacy Policy are below Restore
+> purchases, with the renewal terms above them. The same three links are also
+> in the account sheet behind the avatar.
 
 ## Subscriptions
 
@@ -87,8 +92,27 @@ that shipping the Test Store key is grounds for rejection.
 ## Account deletion — Guideline 5.1.1(v)
 
 An app that creates accounts must delete them from inside the app; a support
-address does not satisfy the rule. Home screen → **Delete account** →
-**Delete permanently**.
+address does not satisfy the rule.
+
+**Dashboard → avatar (top right) → Delete account → Delete permanently.**
+
+Step by step, as a reviewer will do it:
+
+1. Sign in with the demo account. The dashboard opens with three briefs.
+2. Tap the circular avatar at the top right of the header, showing the
+   account's initials. An account sheet slides up.
+3. The sheet lists Privacy Policy, Terms of Use, Support, Sign out, and
+   **Delete account** in red.
+4. Tapping it opens a confirmation dialog naming exactly what is erased, and
+   saying that a store subscription is billed by Apple or Google and is not
+   cancelled by deleting the account.
+5. **Delete permanently** performs it. **Keep my account** backs out.
+
+The first version of this put the button in `MainHomeScreen`, a composable
+nothing renders — it compiled, it read correctly, and it would have shipped
+review notes pointing at a control that does not exist. It was caught by
+screenshotting the running app rather than by reading the code, which is the
+only reason these notes are accurate.
 
 The work is done by the `deleteAccount` Cloud Function rather than the client,
 because security rules deny a client write access to the entitlement and usage
@@ -103,6 +127,24 @@ builds a throwaway account holding a user document, a profile, a brief, a page
 image in Cloud Storage and a usage counter, deletes it, and then checks each
 one from the outside — including that the email can be registered again, which
 distinguishes a deleted record from a disabled one. 17/17.
+
+## Two defects the screenshot pass caught
+
+Neither is a guideline violation, but a reviewer would have seen both.
+
+**Every confirmation dialog rendered as an ellipse.** `AnteroomShapes` set
+`extraLarge = RoundedCornerShape(999.dp)`, presumably for pill-shaped buttons —
+but the buttons all pass their own shape, and `extraLarge` is the token
+Material 3 gives `AlertDialog` and `ModalBottomSheet`. At dialog size a 999.dp
+radius clamps to half the short edge and draws an oval, clipping the title and
+the buttons: "Keep my account" rendered as "Keep my accoun". Three dialogs that
+predate this work were affected too. Now 28.dp, the Material default.
+
+**The paywall printed RevenueCat's developer diagnostic.** `readableMessage()`
+preferred `underlyingErrorMessage`, so with no Play products registered the
+purchase sheet showed six lines of red text about the RevenueCat dashboard,
+including two URLs. Error codes now map to one plain sentence and the
+diagnostic goes to the log.
 
 ## Health data and App Privacy
 
@@ -120,7 +162,13 @@ Answer the App Privacy questionnaire as:
 
 No analytics, advertising, attribution or crash-reporting SDK is linked into
 the app, on either platform, so there is nothing to disclose under Usage Data
-or Diagnostics. Documents are processed by Google Vertex AI in `europe-west1`
+or Diagnostics.
+
+Firestore keeps an offline cache of briefs on the device. GitLive 2.1.0 exposes
+no `clearPersistence`, so account deletion cannot purge it without dropping to
+each platform's native SDK — which is not a change worth making days before an
+upload. The cache is in the app's private container and goes on uninstall, and
+the privacy policy says so rather than implying deletion reaches it. Documents are processed by Google Vertex AI in `europe-west1`
 under the Google Cloud Service Specific Terms.
 
 ## Export compliance
@@ -174,3 +222,17 @@ rather than at submission. Bump it before every archive.
   registered for your offerings". The Kotlin path is identical and works
   against StoreKit, but Android billing cannot be demonstrated until the
   products exist.
+
+## Screenshots of the three surfaces
+
+Captured from the running debug build on an Android emulator, after the fixes
+above, not mocked up:
+
+| File | Shows |
+| --- | --- |
+| `assets/review/account-sheet.png` | Avatar → account sheet, with Delete account |
+| `assets/review/delete-confirmation.png` | The confirmation dialog, rendering correctly |
+| `assets/review/paywall-legal-links.png` | Renewal terms, Terms of Use and Privacy Policy under Restore purchases |
+
+Tapping Terms of Use was confirmed to leave the app and open the system
+browser — the link fires, it is not decorative text.

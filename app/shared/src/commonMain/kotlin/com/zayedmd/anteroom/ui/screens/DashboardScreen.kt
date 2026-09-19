@@ -21,6 +21,7 @@ import com.zayedmd.anteroom.data.ProfilesRepositoryImpl
 import com.zayedmd.anteroom.model.AppUser
 import com.zayedmd.anteroom.model.Brief
 import com.zayedmd.anteroom.model.Profile
+import com.zayedmd.anteroom.ui.components.AccountSheet
 import com.zayedmd.anteroom.ui.components.BriefCard
 import com.zayedmd.anteroom.ui.components.DashboardHeader
 import com.zayedmd.anteroom.ui.components.EmptyDashboardView
@@ -30,7 +31,6 @@ import com.zayedmd.anteroom.ui.components.SnapPaperworkBottomBar
 import com.zayedmd.anteroom.ui.components.UpgradeBanner
 import com.zayedmd.anteroom.ui.runSafely
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
-import kotlinx.coroutines.launch
 
 @Composable
 fun DashboardScreen(
@@ -45,11 +45,11 @@ fun DashboardScreen(
     onSnapClick: () -> Unit = {},
     onBriefClick: (Brief) -> Unit = {}
 ) {
-    val scope = rememberCoroutineScope()
     var profiles by remember { mutableStateOf<List<Profile>>(emptyList()) }
     var briefs by remember { mutableStateOf<List<Brief>>(emptyList()) }
     var activeProfileId by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+    var showAccountSheet by remember { mutableStateOf(false) }
 
     // Load profiles once
     LaunchedEffect(user.user_id) {
@@ -90,9 +90,11 @@ fun DashboardScreen(
                     activeProfile = activeProfile,
                     isSubscribed = isSubscribed,
                     onUpgradeClick = onUpgradeClick,
-                    onAvatarClick = {
-                        scope.launch { authService.signOut() }
-                    }
+                    // Opens account actions rather than signing out on the
+                    // spot. A single tap on your own avatar used to end the
+                    // session with no confirmation, and the sheet is also
+                    // where account deletion has to live -- see AccountSheet.
+                    onAvatarClick = { showAccountSheet = true }
                 )
 
                 HorizontalDivider(color = AnteroomColors.Border, thickness = 0.5.dp)
@@ -179,5 +181,13 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+
+    if (showAccountSheet) {
+        AccountSheet(
+            user = user,
+            authService = authService,
+            onDismiss = { showAccountSheet = false }
+        )
     }
 }
