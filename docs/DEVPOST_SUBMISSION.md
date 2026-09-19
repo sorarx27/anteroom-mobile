@@ -256,12 +256,13 @@ Being precise about this matters more than the pitch does.
 
 ### How we know
 
-Three suites, all runnable against the live project rather than a mock:
+Four suites, all runnable against the live project rather than a mock:
 
 | Suite | Checks | Proves |
 | --- | --- | --- |
-| `tools/verify_rules.py` | 20 | Cross-user denial, server-only clinical fields, storage limits |
+| `tools/verify_rules.py` | 21 | Cross-user denial, server-only clinical fields, storage limits |
 | `tools/verify_pipeline.py` | 43 | The whole pipeline, both paywall gates, entitlement grant and revoke |
+| `tools/verify_account_deletion.py` | 17 | That deleting an account really erases it, checked from outside |
 | `functions/tests/test_pipeline.py` | 56 | Translation safety boundary, PDF, frequency lookup |
 
 The rules suite earned its keep immediately. It found that our brief-create
@@ -328,8 +329,8 @@ it can't confirm.
 
 ## What's next
 
-- Validate the brief format with clinicians in Valencia, as a student
-  research project. The question we want answered is not "is it accurate"
+- Validate the brief format with clinicians, as a student research
+  project. The question we want answered is not "is it accurate"
   but "does the flagged-items section change what you ask the patient".
 - Expand language coverage beyond English and Spanish. The frequency lookup
   table is per-language and the extraction prompt is language-agnostic, so
@@ -355,8 +356,8 @@ it can't confirm.
 
 - **Dr. Ahmed Zayed** — Medical Advisor, Clinical Co-founder, and Student
   Researcher. MBBCh, Alexandria University, 2013. Twelve years in clinical
-  practice. Currently enrolled in a Master's program at Universitat
-  Politècnica de València.
+  practice. Currently enrolled in a Master's program at RWTH Aachen
+  University.
 - **Gerhard Homveld** — Business entity and app publishing, through a US
   entity.
 

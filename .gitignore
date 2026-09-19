@@ -31,3 +31,6 @@ scratchpad/
 
 # Firebase CLI deploy cache
 .firebase/
+
+# App Store Connect API private keys. These must never enter the repo.
+*.p8
