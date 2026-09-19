@@ -75,11 +75,17 @@ def token() -> str:
     )
 
 
-def api(path: str, params: dict | None = None) -> dict:
+def api(path: str, params: dict | None = None, method: str | None = None,
+        body: dict | None = None) -> dict:
+    """One App Store Connect call. Other tools import this for the auth."""
     url = f"{API}/{path}"
     if params:
         url += "?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token()})
+    payload = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=payload, method=method or ("POST" if payload else "GET"))
+    req.add_header("Authorization", "Bearer " + token())
+    if payload is not None:
+        req.add_header("Content-Type", "application/json")
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
             return json.loads(r.read().decode())
