@@ -168,7 +168,7 @@ fun AuthScreen(
                 Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
                     value = email,
-                    onValueChange = { email = it },
+                    onValueChange = { email = it; error = null },
                     placeholder = { Text("you@example.com", color = AnteroomColors.Muted) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
@@ -197,7 +197,7 @@ fun AuthScreen(
                 Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
                     value = password,
-                    onValueChange = { password = it },
+                    onValueChange = { password = it; error = null },
                     placeholder = { Text("At least 6 characters", color = AnteroomColors.Muted) },
                     singleLine = true,
                     visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
