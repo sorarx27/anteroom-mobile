@@ -13,7 +13,6 @@ interface AuthService {
 
     suspend fun signInEmail(email: String, password: String)
     suspend fun signUpEmail(email: String, password: String)
-    suspend fun signInWithGoogle(idToken: String? = null, accessToken: String? = null)
     suspend fun updateProfile(name: String, dob: String, language: String, country: String)
     suspend fun signOut()
 

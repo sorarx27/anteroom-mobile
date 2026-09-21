@@ -1,7 +1,6 @@
 package com.zayedmd.anteroom.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -32,6 +31,34 @@ import kotlinx.coroutines.launch
 
 enum class AuthMode {
     SignIn, SignUp
+}
+
+/**
+ * Turns a Firebase auth failure into something a patient can act on.
+ *
+ * `Exception.message` here is the platform SDK's raw error description --
+ * on iOS that is the whole NSError, `Error Domain=FIRAuthErrorDomain
+ * Code=17007 ... UserInfo={...}`. Showing that to a user is both useless
+ * and a review risk, so match on the stable code names Firebase embeds in
+ * the text and fall back to a plain sentence.
+ */
+internal fun friendlyAuthError(e: Throwable): String {
+    val raw = e.message ?: return "Something went wrong. Please try again."
+    return when {
+        raw.contains("EMAIL_ALREADY_IN_USE", true) || raw.contains("already in use", true) ->
+            "That email already has an account. Switch to Sign in below."
+        raw.contains("USER_NOT_FOUND", true) || raw.contains("no user record", true) ->
+            "No account found for that email. Create one below."
+        raw.contains("WRONG_PASSWORD", true) || raw.contains("INVALID_CREDENTIAL", true) ||
+            raw.contains("INVALID_LOGIN_CREDENTIALS", true) || raw.contains("password is invalid", true) ->
+            "Email or password is incorrect."
+        raw.contains("INVALID_EMAIL", true) -> "That email address doesn't look right."
+        raw.contains("WEAK_PASSWORD", true) -> "Password must be at least 6 characters."
+        raw.contains("NETWORK", true) -> "No connection. Check your internet and try again."
+        raw.contains("TOO_MANY_REQUESTS", true) -> "Too many attempts. Wait a moment, then try again."
+        raw.contains("USER_DISABLED", true) -> "This account has been disabled."
+        else -> "Something went wrong. Please try again."
+    }
 }
 
 @Composable
@@ -71,7 +98,7 @@ fun AuthScreen(
                     authService.signInEmail(email.trim().lowercase(), password)
                 }
             } catch (e: Exception) {
-                error = e.message ?: "Authentication failed. Please check your credentials."
+                error = friendlyAuthError(e)
             } finally {
                 loading = false
             }
@@ -250,76 +277,6 @@ fun AuthScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Divider Row ("or")
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    HorizontalDivider(
-                        modifier = Modifier.weight(1f),
-                        color = AnteroomColors.Border
-                    )
-                    Text(
-                        text = "or",
-                        color = AnteroomColors.Muted,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.weight(1f),
-                        color = AnteroomColors.Border
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Google Button
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp)
-                        .border(
-                            width = 1.dp,
-                            color = AnteroomColors.BorderStrong,
-                            shape = RoundedCornerShape(999.dp)
-                        )
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(AnteroomColors.Surface)
-                        .clickable(enabled = !loading) {
-                            error = null
-                            loading = true
-                            scope.launch {
-                                try {
-                                    authService.signInWithGoogle()
-                                } catch (e: Exception) {
-                                    error = e.message ?: "Google sign-in is being initialized."
-                                } finally {
-                                    loading = false
-                                }
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(
-                            text = "G",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = AnteroomColors.BrandPrimary
-                        )
-                        Text(
-                            text = "Continue with Google",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AnteroomColors.OnSurface
-                        )
-                    }
-                }
             }
 
             // Mode Toggle Link at Bottom

@@ -6,7 +6,6 @@ import com.zayedmd.anteroom.data.ProfilesRepositoryImpl
 import com.zayedmd.anteroom.data.requireUid
 import com.zayedmd.anteroom.firebase.FirebaseService
 import dev.gitlive.firebase.auth.FirebaseUser
-import dev.gitlive.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,31 +54,28 @@ class AuthServiceImpl(
     }
 
     private suspend fun loadUserProfile(firebaseUser: FirebaseUser) {
-        val doc = FirebaseService.firestore.collection("users").document(firebaseUser.uid).get()
-        val appUser = if (doc.exists) {
-            try {
-                doc.data<AppUser>()
-            } catch (e: Exception) {
-                AppUser(
-                    user_id = firebaseUser.uid,
-                    email = firebaseUser.email ?: "",
-                    name = firebaseUser.displayName,
-                    picture = firebaseUser.photoURL,
-                    profile_completed = false,
-                    provider = "email"
-                )
+        val fallback = AppUser(
+            user_id = firebaseUser.uid,
+            email = firebaseUser.email ?: "",
+            name = firebaseUser.displayName,
+            picture = firebaseUser.photoURL,
+            profile_completed = false,
+            provider = "email"
+        )
+        val userDoc = FirebaseService.firestore.collection("users").document(firebaseUser.uid)
+        val doc = runCatching { userDoc.get() }.getOrNull()
+        val appUser = when {
+            // The read itself failed, which in practice means the network did.
+            // Firebase Auth still holds a valid session, so keep it and carry on
+            // with what the token already tells us. Dropping to Unauthenticated
+            // here is what makes a signed-in user look signed out on a bad
+            // connection; the profile reloads on the next auth state emission.
+            doc == null -> fallback
+            doc.exists -> runCatching { doc.data<AppUser>() }.getOrDefault(fallback)
+            else -> {
+                runCatching { userDoc.set(fallback) }
+                fallback
             }
-        } else {
-            val newUser = AppUser(
-                user_id = firebaseUser.uid,
-                email = firebaseUser.email ?: "",
-                name = firebaseUser.displayName,
-                picture = firebaseUser.photoURL,
-                profile_completed = false,
-                provider = "email"
-            )
-            FirebaseService.firestore.collection("users").document(firebaseUser.uid).set(newUser)
-            newUser
         }
         bootstrapSelfProfile(appUser)
         _user.value = appUser
@@ -128,17 +124,6 @@ class AuthServiceImpl(
         bootstrapSelfProfile(newUser)
         _user.value = newUser
         _status.value = AuthStatus.Authenticated
-    }
-
-    override suspend fun signInWithGoogle(idToken: String?, accessToken: String?) {
-        if (idToken != null) {
-            val credential = GoogleAuthProvider.credential(idToken, accessToken)
-            val result = FirebaseService.auth.signInWithCredential(credential)
-            val fbUser = result.user ?: throw IllegalStateException("Google sign in failed")
-            loadUserProfile(fbUser)
-        } else {
-            throw IllegalArgumentException("Google ID token required for sign-in")
-        }
     }
 
     override suspend fun updateProfile(name: String, dob: String, language: String, country: String) {
