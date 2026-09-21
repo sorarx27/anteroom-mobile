@@ -66,6 +66,7 @@ fun AnteroomApp(
 
     val status by authService.status.collectAsState()
     val user by authService.user.collectAsState()
+    val profileStatusKnown by authService.profileStatusKnown.collectAsState()
     val isSubscribed by SubscriptionService.isSubscribed.collectAsState()
 
     var onboardingDestination by remember { mutableStateOf<OnboardingDestination>(OnboardingDestination.Welcome) }
@@ -169,7 +170,11 @@ fun AnteroomApp(
 
                 AuthStatus.Authenticated -> {
                     val currentUser = user
-                    if (currentUser != null && !currentUser.profile_completed) {
+                    // Only send someone to profile setup when we actually read
+                    // their profile and it really is incomplete. On a failed read
+                    // the fallback says "incomplete" because it has no way to say
+                    // "unknown", and acting on that strands an established user.
+                    if (currentUser != null && !currentUser.profile_completed && profileStatusKnown) {
                         ProfileSetupScreen(
                             user = currentUser,
                             authService = authService

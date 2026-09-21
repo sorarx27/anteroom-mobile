@@ -11,7 +11,22 @@ interface AuthService {
     val user: StateFlow<AppUser?>
     val status: StateFlow<AuthStatus>
 
+    /**
+     * False when the signed-in user's `users/{uid}` document could not be
+     * read and the session is running on the identity in the token alone.
+     *
+     * The fallback user carries `profile_completed = false` because there is
+     * no third value for "unknown" -- and the navigation gate routes on that
+     * field. Without this flag an established user whose profile read failed
+     * (offline cold start, most often) is sent to profile setup instead of
+     * their dashboard, and the setup form's write then never completes.
+     */
+    val profileStatusKnown: StateFlow<Boolean>
+
     suspend fun signInEmail(email: String, password: String)
+
+    /** Sends Firebase's password-reset email. The only recovery path there is. */
+    suspend fun sendPasswordReset(email: String)
     suspend fun signUpEmail(email: String, password: String)
     suspend fun updateProfile(name: String, dob: String, language: String, country: String)
     suspend fun signOut()

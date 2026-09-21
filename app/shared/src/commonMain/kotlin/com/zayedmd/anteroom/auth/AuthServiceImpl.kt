@@ -25,6 +25,9 @@ class AuthServiceImpl(
     private val _status = MutableStateFlow<AuthStatus>(AuthStatus.Loading)
     override val status: StateFlow<AuthStatus> = _status.asStateFlow()
 
+    private val _profileStatusKnown = MutableStateFlow(true)
+    override val profileStatusKnown: StateFlow<Boolean> = _profileStatusKnown.asStateFlow()
+
     private val scope = CoroutineScope(Dispatchers.Default)
 
     init {
@@ -70,9 +73,16 @@ class AuthServiceImpl(
             // with what the token already tells us. Dropping to Unauthenticated
             // here is what makes a signed-in user look signed out on a bad
             // connection; the profile reloads on the next auth state emission.
-            doc == null -> fallback
-            doc.exists -> runCatching { doc.data<AppUser>() }.getOrDefault(fallback)
+            doc == null -> {
+                _profileStatusKnown.value = false
+                fallback
+            }
+            doc.exists -> {
+                _profileStatusKnown.value = true
+                runCatching { doc.data<AppUser>() }.getOrDefault(fallback)
+            }
             else -> {
+                _profileStatusKnown.value = true
                 runCatching { userDoc.set(fallback) }
                 fallback
             }
@@ -153,11 +163,16 @@ class AuthServiceImpl(
         signOut()
     }
 
+    override suspend fun sendPasswordReset(email: String) {
+        FirebaseService.auth.sendPasswordResetEmail(email)
+    }
+
     override suspend fun signOut() {
         try {
             FirebaseService.auth.signOut()
         } catch (_: Exception) {}
         tokenStorage.clearToken()
+        _profileStatusKnown.value = true
         _user.value = null
         _status.value = AuthStatus.Unauthenticated
     }

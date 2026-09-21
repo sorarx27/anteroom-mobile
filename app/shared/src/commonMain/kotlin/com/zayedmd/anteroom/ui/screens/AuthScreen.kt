@@ -73,6 +73,8 @@ fun AuthScreen(
     var showPassword by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var notice by remember { mutableStateOf<String?>(null) }
+    var resetting by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
 
@@ -89,6 +91,7 @@ fun AuthScreen(
     fun submit() {
         if (!canSubmit) return
         error = null
+        notice = null
         loading = true
         scope.launch {
             try {
@@ -168,7 +171,7 @@ fun AuthScreen(
                 Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
                     value = email,
-                    onValueChange = { email = it; error = null },
+                    onValueChange = { email = it; error = null; notice = null },
                     placeholder = { Text("you@example.com", color = AnteroomColors.Muted) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
@@ -197,7 +200,7 @@ fun AuthScreen(
                 Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
                     value = password,
-                    onValueChange = { password = it; error = null },
+                    onValueChange = { password = it; error = null; notice = null },
                     placeholder = { Text("At least 6 characters", color = AnteroomColors.Muted) },
                     singleLine = true,
                     visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
@@ -226,6 +229,63 @@ fun AuthScreen(
                         unfocusedContainerColor = AnteroomColors.SurfaceSecondary
                     )
                 )
+
+                // Forgot password -- the only recovery path, so it lives next
+                // to the field it recovers.
+                if (mode == AuthMode.SignIn) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                        Text(
+                            text = if (resetting) "Sending..." else "Forgot password?",
+                            color = AnteroomColors.BrandPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .clickable(enabled = !resetting && !loading) {
+                                    error = null
+                                    notice = null
+                                    if (!validEmail) {
+                                        error = "Enter your email address first, then tap Forgot password."
+                                    } else {
+                                        resetting = true
+                                        val target = email.trim().lowercase()
+                                        scope.launch {
+                                            try {
+                                                authService.sendPasswordReset(target)
+                                                // Deliberately not confirming whether the
+                                                // address is registered -- that would let
+                                                // anyone enumerate accounts.
+                                                notice = "If an account exists for $target, a reset link is on its way. Check spam too."
+                                            } catch (e: Exception) {
+                                                error = friendlyAuthError(e)
+                                            } finally {
+                                                resetting = false
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(4.dp)
+                        )
+                    }
+                }
+
+                // Notice (password reset confirmation)
+                if (notice != null) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFE8F1EC), shape = RoundedCornerShape(8.dp))
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = notice ?: "",
+                            color = AnteroomColors.BrandPrimary,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
 
                 // Error Message
                 if (error != null) {
@@ -305,6 +365,7 @@ fun AuthScreen(
                     modifier = Modifier
                         .clickable {
                             error = null
+                            notice = null
                             mode = if (mode == AuthMode.SignUp) AuthMode.SignIn else AuthMode.SignUp
                         }
                         .padding(8.dp)
