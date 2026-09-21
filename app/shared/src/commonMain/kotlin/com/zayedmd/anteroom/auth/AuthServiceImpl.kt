@@ -154,13 +154,19 @@ class AuthServiceImpl(
         // 300s to match the function: an account with six-page briefs can be a
         // few hundred Storage objects, and the default 70s callable timeout
         // would report failure over a purge that is still running.
-        FirebaseService.functions
-            .httpsCallable("deleteAccount", timeout = 300.seconds)
-            .invoke(DeleteAccountRequest.serializer(), DeleteAccountRequest())
-
-        // Only after the server confirms. Signing out first would drop the ID
-        // token the callable authenticates with.
-        signOut()
+        // Signing out first would drop the ID token the callable
+        // authenticates with, so it has to happen after the call is made --
+        // but it has to happen whether or not the response comes back. The
+        // function deletes the auth user last, so a dropped connection or a
+        // 300s overrun can mean the account is gone while this client still
+        // believes it is signed in, and keeps rendering a dashboard for it.
+        try {
+            FirebaseService.functions
+                .httpsCallable("deleteAccount", timeout = 300.seconds)
+                .invoke(DeleteAccountRequest.serializer(), DeleteAccountRequest())
+        } finally {
+            signOut()
+        }
     }
 
     override suspend fun sendPasswordReset(email: String) {

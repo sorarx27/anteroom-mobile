@@ -127,6 +127,13 @@ fun AnteroomApp(
                 }
 
                 AuthStatus.Unauthenticated -> {
+                    // onboardingDestination survives the session, so without this
+                    // a user who signed up, used the app and then signed out (or
+                    // deleted their account -- the reviewer's path) is dropped
+                    // straight back onto "Create your account".
+                    LaunchedEffect(Unit) {
+                        onboardingDestination = OnboardingDestination.Welcome
+                    }
                     AnimatedContent(
                         targetState = onboardingDestination,
                         transitionSpec = { fadeIn() togetherWith fadeOut() }

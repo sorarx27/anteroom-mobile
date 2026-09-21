@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.zayedmd.anteroom.auth.AuthService
 import com.zayedmd.anteroom.model.AppUser
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
+import com.zayedmd.anteroom.ui.userMessage
 import kotlinx.coroutines.launch
 
 data class LanguageOption(val code: String, val label: String, val flag: String)
@@ -101,7 +102,7 @@ fun ProfileSetupScreen(
                     country = selectedCountry?.label ?: "United States"
                 )
             } catch (e: Exception) {
-                error = e.message ?: "Could not complete profile setup"
+                error = e.userMessage()
             } finally {
                 loading = false
             }
