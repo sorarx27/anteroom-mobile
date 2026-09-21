@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zayedmd.anteroom.auth.AuthService
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
+import com.zayedmd.anteroom.ui.userMessage
 import kotlinx.coroutines.launch
 
 enum class AuthMode {
@@ -43,6 +44,11 @@ enum class AuthMode {
  * the text and fall back to a plain sentence.
  */
 internal fun friendlyAuthError(e: Throwable): String {
+    // Keep the original where it can be read. AnteroomErrors is not the
+    // place for it -- that drives a global message and would double up with
+    // the banner this screen already shows, and it stores the friendly text
+    // rather than the raw. The console is enough to diagnose from.
+    println("[auth] ${e::class.simpleName}: ${e.message}")
     val raw = e.message ?: return "Something went wrong. Please try again."
     return when {
         raw.contains("EMAIL_ALREADY_IN_USE", true) || raw.contains("already in use", true) ->
@@ -57,7 +63,11 @@ internal fun friendlyAuthError(e: Throwable): String {
         raw.contains("NETWORK", true) -> "No connection. Check your internet and try again."
         raw.contains("TOO_MANY_REQUESTS", true) -> "Too many attempts. Wait a moment, then try again."
         raw.contains("USER_DISABLED", true) -> "This account has been disabled."
-        else -> "Something went wrong. Please try again."
+        // Not an auth code. Sign-up also writes the user's Firestore document,
+        // so a PERMISSION_DENIED or an offline failure lands here -- and those
+        // are exactly what userMessage() already knows how to phrase. Falling
+        // back to a generic sentence threw that information away.
+        else -> e.userMessage()
     }
 }
 

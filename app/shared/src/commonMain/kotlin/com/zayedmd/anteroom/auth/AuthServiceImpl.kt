@@ -130,7 +130,15 @@ class AuthServiceImpl(
             profile_completed = false,
             provider = "email"
         )
-        FirebaseService.firestore.collection("users").document(fbUser.uid).set(newUser)
+        // The Firebase Auth account exists from this point on, so a failure
+        // writing the profile document must not be reported as "sign-up
+        // failed". It used to be, which left the account created, the user
+        // signed in, and the UI claiming nothing had happened -- and the only
+        // hint on a retry was "that email already has an account". The
+        // document is recreated by loadUserProfile on the next auth emission.
+        runCatching {
+            FirebaseService.firestore.collection("users").document(fbUser.uid).set(newUser)
+        }.onFailure { println("[auth] profile write after sign-up failed: ${it.message}") }
         bootstrapSelfProfile(newUser)
         _user.value = newUser
         _status.value = AuthStatus.Authenticated
