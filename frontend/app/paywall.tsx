@@ -12,10 +12,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import * as WebBrowser from "expo-web-browser";
 import type { PurchasesPackage } from "react-native-purchases";
 
 import { useSubscription } from "@/src/lib/revenuecat";
 import { useAuth } from "@/src/auth/AuthContext";
+import { PRIVACY_URL, TERMS_URL } from "@/src/constants/links";
 import { colors, radius, spacing } from "@/src/theme";
 
 const PRO_FEATURES: { icon: string; title: string; body: string }[] = [
@@ -246,8 +248,27 @@ export default function Paywall() {
         </Pressable>
 
         <Text style={styles.legal}>
-          Subscriptions auto-renew until cancelled. Manage or cancel any time in your
-          store account. By continuing you agree to our Terms and Privacy Policy.
+          Anteroom Pro is €2.99 per month or €29.99 per year. Payment is charged to
+          your Apple Account at confirmation of purchase. The subscription renews
+          automatically unless auto-renew is turned off at least 24 hours before the
+          end of the current period. Manage or cancel any time in your Apple Account
+          settings. By continuing you agree to our{" "}
+          <Text
+            testID="paywall-terms-link"
+            style={styles.legalLink}
+            onPress={() => WebBrowser.openBrowserAsync(TERMS_URL)}
+          >
+            Terms of Use
+          </Text>
+          {" and "}
+          <Text
+            testID="paywall-privacy-link"
+            style={styles.legalLink}
+            onPress={() => WebBrowser.openBrowserAsync(PRIVACY_URL)}
+          >
+            Privacy Policy
+          </Text>
+          .
         </Text>
       </ScrollView>
 
@@ -474,6 +495,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     textAlign: "center",
+  },
+  legalLink: {
+    color: colors.brandPrimary,
+    fontWeight: "600",
+    textDecorationLine: "underline",
   },
   footer: {
     position: "absolute",

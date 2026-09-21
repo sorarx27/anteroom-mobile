@@ -40,7 +40,7 @@ const SLIDES: Slide[] = [
       "https://images.unsplash.com/photo-1651760680066-db9d32bd0357?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHwxfHxlbXB0eSUyMG1lZGljYWwlMjBjbGlwYm9hcmQlMjBjbGVhbnxlbnwwfHx8fDE3ODk0ODU2MDR8MA&ixlib=rb-4.1.0&q=85",
     title: "Walk in doctor-ready.",
     subtitle:
-      "One clean page. Flags unreadable high-risk doses instead of guessing. Export a PDF with a clinic QR.",
+      "One clean page. Flags unreadable high-risk doses instead of guessing. Export a PDF with a clinic QR.\n\nAnteroom does not diagnose and does not recommend treatment. It organises what is already written on your documents.",
   },
 ];
 

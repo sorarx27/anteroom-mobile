@@ -132,3 +132,42 @@ class TestLogout:
         # Same token must now be 401
         r2 = requests.get(f"{API}/auth/me", headers={"Authorization": f"Bearer {token}"})
         assert r2.status_code == 401
+
+
+# ---- Account deletion (App Store Guideline 5.1.1(v)) ----
+class TestDeleteAccount:
+    def test_delete_requires_auth(self, s):
+        r = s.delete(f"{API}/auth/account")
+        assert r.status_code == 401
+
+    def test_delete_removes_account_and_owned_data(self, s):
+        email = f"qa_delete_{TS}@anteroom.dev"
+        reg = s.post(f"{API}/auth/register", json={"email": email, "password": PASSWORD})
+        assert reg.status_code == 200, reg.text
+        token = reg.json()["session_token"]
+        auth = {"Authorization": f"Bearer {token}"}
+
+        # Give the account something to own: a self profile and a draft brief.
+        profile = s.put(
+            f"{API}/auth/profile",
+            headers=auth,
+            json={"name": "QA Delete", "dob": "1990-01-01", "language": "en", "country": "ES"},
+        )
+        assert profile.status_code == 200, profile.text
+        brief = s.post(f"{API}/briefs", headers=auth, json={})
+        assert brief.status_code == 200, brief.text
+
+        r = s.delete(f"{API}/auth/account", headers=auth)
+        assert r.status_code == 200, r.text
+        assert r.json().get("ok") is True
+
+        # The session must be dead immediately.
+        assert requests.get(f"{API}/auth/me", headers=auth).status_code == 401
+
+        # The old credentials must no longer authenticate.
+        assert s.post(f"{API}/auth/login", json={"email": email, "password": PASSWORD}).status_code == 401
+
+        # The address must be reusable — the record is gone, not tombstoned.
+        again = s.post(f"{API}/auth/register", json={"email": email, "password": PASSWORD})
+        assert again.status_code == 200, again.text
+        assert again.json()["user"]["profile_completed"] is False

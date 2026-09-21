@@ -42,6 +42,7 @@ type AuthContextValue = {
     country: string;
   }) => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -79,6 +80,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       /* ignore */
     }
+    await clearToken();
+    setAuthToken(null);
+    setUser(null);
+    setStatus("unauthenticated");
+  }, []);
+
+  const doDeleteAccount = useCallback(async () => {
+    // Server first: if this throws, the user stays signed in and sees the error
+    // rather than being logged out of an account that still exists.
+    await api.del("/auth/account");
     await clearToken();
     setAuthToken(null);
     setUser(null);
@@ -257,6 +268,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithGoogle,
       updateProfile,
       signOut: doSignOut,
+      deleteAccount: doDeleteAccount,
     }),
     [
       status,
@@ -267,6 +279,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithGoogle,
       updateProfile,
       doSignOut,
+      doDeleteAccount,
     ],
   );
 

@@ -59,7 +59,7 @@ export default function Dashboard() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { isSubscribed } = useSubscription();
   const {
     profiles,
@@ -261,7 +261,8 @@ export default function Dashboard() {
           )}
           <Pressable
             testID="dashboard-avatar"
-            onPress={signOut}
+            onPress={() => router.push("/settings")}
+            accessibilityLabel="Settings"
             style={styles.avatar}
             hitSlop={8}
           >

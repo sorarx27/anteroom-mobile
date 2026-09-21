@@ -1,4 +1,4 @@
-"""Authentication routes — register / login / Google session / me / logout / profile."""
+"""Authentication routes — register / login / Google session / me / logout / profile / delete."""
 
 from __future__ import annotations
 
@@ -136,6 +136,25 @@ async def logout(request: Request, user: dict = Depends(get_current_user)):
     auth = request.headers.get("authorization") or request.headers.get("Authorization")
     token = auth.split(" ", 1)[1].strip()
     await db.user_sessions.delete_one({"session_token": token})
+    return {"ok": True}
+
+
+@router.delete("/auth/account")
+async def delete_account(user: dict = Depends(get_current_user)):
+    """Permanently delete the account and everything owned by it.
+
+    Required by App Store Review Guideline 5.1.1(v): an app that supports
+    account creation must let the user initiate deletion from inside the app.
+    """
+    user_id = user["user_id"]
+    await db.briefs.delete_many({"user_id": user_id})
+    await db.profiles.delete_many({"user_id": user_id})
+    await db.user_sessions.delete_many({"user_id": user_id})
+    result = await db.users.delete_one({"user_id": user_id})
+    if result.deleted_count != 1:
+        logger.error("account deletion left user %s in place", user_id)
+        raise HTTPException(status_code=500, detail="Account deletion failed")
+    logger.info("account deleted: %s", user_id)
     return {"ok": True}
 
 
