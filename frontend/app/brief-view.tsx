@@ -257,7 +257,7 @@ export default function BriefView() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.disclaimer}>
-          Extracted directly from the patient’s documents. No diagnosis, nothing invented — if a field isn’t shown, it wasn’t clearly on the page.
+          Extracted directly from the patient’s documents. No diagnosis, nothing invented — if a field isn’t shown, it wasn’t clearly on the page. Anteroom is not a medical device and does not recommend treatment. Check this brief against the original documents.
         </Text>
 
         {nothingDetected ? (

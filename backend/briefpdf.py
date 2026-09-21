@@ -46,7 +46,7 @@ LABELS = {
         "flagged": "Flagged for review",
         "scan": "Scan to view online",
         "footer_id": "Anteroom pre-visit brief • ID",
-        "footer_note": "Extracted directly from patient documents — no diagnosis.",
+        "footer_note": "From the patient's own documents. Not a medical device — no diagnosis. Check against the originals.",
         "watermark_ribbon": "ANTEROOM FREE — Upgrade for clean export",
     },
     "es": {
@@ -69,7 +69,7 @@ LABELS = {
         "flagged": "Marcado para revisar",
         "scan": "Escanear para ver en línea",
         "footer_id": "Resumen previo Anteroom • ID",
-        "footer_note": "Extraído directamente de los documentos del paciente — sin diagnóstico.",
+        "footer_note": "De los documentos del propio paciente. No es un producto sanitario — sin diagnóstico. Compruebe con los originales.",
         "watermark_ribbon": "ANTEROOM FREE — Actualiza para exportar sin marca",
     },
 }
