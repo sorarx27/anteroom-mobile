@@ -1,20 +1,22 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "Anteroom",
+    "slug": "anteroom",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "anteroom",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.emergent.medicalbriefsetup.uhg3cv",
       "infoPlist": {
-        "NSCameraUsageDescription": "Snap medical documents for your briefs",
-        "NSPhotoLibraryUsageDescription": "Attach photos of medical documents to briefs",
-        "NSPhotoLibraryAddUsageDescription": "Save exported briefs to your photos"
-      }
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Anteroom uses the camera so you can photograph your own medical documents and turn them into a pre-visit brief.",
+        "NSPhotoLibraryUsageDescription": "Anteroom needs access to your photo library so you can attach existing photos of medical documents to a brief.",
+        "NSPhotoLibraryAddUsageDescription": "Anteroom saves exported briefs to your photo library when you choose to save one."
+      },
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
