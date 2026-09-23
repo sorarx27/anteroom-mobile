@@ -10,9 +10,32 @@ This document is the working copy of the RevenueCat Ship-a-ton 2026
 submission. It covers the problem, the build, exactly what runs today, and
 what doesn't.
 
-- **Submission deadline:** October 1, 2026
+- **Submission deadline:** Wednesday, September 30, 2026, 11:45pm PDT
 - **Repository branch:** `kotlin`
 - **Bundle ID:** `com.zayedmd.anteroom`
+
+## For judges
+
+- **Install.** iOS beta on TestFlight:
+  <https://testflight.apple.com/join/EvbxqXGU>. This is build 1.0 (2),
+  approved by Apple for external testers. TestFlight is a beta channel, not
+  a public App Store release.
+- **Sign in.** `test1@anteroom.dev` / `password123`. The account already has
+  three generated briefs, two of them translated to Spanish. Pro is
+  deliberately inactive so that you meet the paywall.
+- **Reach the paywall.** Tap **Upgrade** in the dashboard header, or tap any
+  locked Pro feature: **Pro to translate** on a brief, the upgrade ribbon
+  on a brief, or adding a family profile.
+- **Purchases on TestFlight are free.** In-app purchases in a TestFlight
+  build run in Apple's sandbox and are never charged. You can buy Monthly or
+  Lifetime and watch Pro unlock without paying anything.
+- **The demo account is shared.** The entitlement follows the account, so a
+  purchase on it unlocks Pro for every judge who signs in after you. To test
+  the purchase itself, create your own account from the sign-in screen.
+- **After the App Store release,** Pro access for judges will be by App
+  Store offer code.
+
+  `OFFER CODE: to be added`
 
 ## Elevator pitch
 
@@ -374,12 +397,24 @@ it can't confirm.
 
 ## Award tracks
 
-- **Next Gen / Student Award.** Anteroom is submitted with a working demo
-  and a public open-source repository, built by an actively enrolled
-  Master's student.
-- **Kotlin Multiplatform Reach Award.** 100% Compose Multiplatform UI across
-  iOS and Android, with Desktop and Web from the same codebase, monetized
-  with the official `purchases-kmp` SDK.
+- **Main prizes.** These require the first public version to be released on
+  the App Store, Google Play or Galaxy Store during the submission period,
+  and TestFlight does not count. Anteroom 1.0 is being submitted to the App
+  Store this week. It is eligible if Apple approves the release before the
+  deadline, and not otherwise.
+- **Next Gen / Student Award.** No store release is required. Anteroom is
+  submitted with a demo video and a public open-source repository,
+  [github.com/sorarx27/anteroom-mobile](https://github.com/sorarx27/anteroom-mobile)
+  (branch `kotlin`), under the MIT license in [`LICENSE`](../LICENSE). It
+  is built by an actively enrolled Master's student.
+  <!-- CHECK: enrollment claim must match the .edu email used for Next Gen verification -->
+- **Ship Kotlin Everywhere.** This award needs live App Store and Google Play
+  listings. The code qualifies: 100% Compose Multiplatform UI and one
+  `purchases-kmp` implementation for both stores. The listings do not yet.
+  The Play products do not exist, and a new personal Play Console account
+  must run a 14-day closed test with 20 testers before it can publish.
+  Anteroom is eligible only if the Play listing is live by the deadline, and
+  we are not counting on it.
 - **Most Likely to Make Money.** The clinical intake and language bottleneck
   for expats and retirees seeing doctors in Spain is a recurring,
   paid-for problem with a clear willingness to pay at the household level.
@@ -390,6 +425,7 @@ it can't confirm.
   Researcher. MBBCh, Alexandria University, 2013. Twelve years in clinical
   practice. Currently enrolled in a Master's program at RWTH Aachen
   University.
+  <!-- CHECK: enrollment claim must match the .edu email used for Next Gen verification -->
 - **Gerhard Homveld** — Business entity and app publishing, through a US
   entity.
 

@@ -14,6 +14,28 @@ Compose Multiplatform UI and no per-platform screens. Billing is RevenueCat
 > **[Install the iOS beta on TestFlight](https://testflight.apple.com/join/EvbxqXGU)** — build 1.0 (2),
 > approved by Apple and open to external testers.
 
+## For judges
+
+- **Install.** iOS beta on
+  [TestFlight](https://testflight.apple.com/join/EvbxqXGU). TestFlight is a
+  beta channel, not a public App Store release.
+- **Sign in.** `test1@anteroom.dev` / `password123`. The account already has
+  three generated briefs, two of them translated to Spanish. Pro is
+  deliberately inactive so that you meet the paywall.
+- **Reach the paywall.** Tap **Upgrade** in the dashboard header, or tap any
+  locked Pro feature: **Pro to translate** on a brief, the upgrade ribbon
+  on a brief, or adding a family profile.
+- **Purchases on TestFlight are free.** In-app purchases in a TestFlight
+  build run in Apple's sandbox and are never charged. You can buy Monthly or
+  Lifetime and watch Pro unlock without paying anything.
+- **The demo account is shared.** The entitlement follows the account, so a
+  purchase on it unlocks Pro for every judge who signs in after you. To test
+  the purchase itself, create your own account from the sign-in screen.
+- **After the App Store release,** Pro access for judges will be by App
+  Store offer code.
+
+  `OFFER CODE: to be added`
+
 <p align="center">
   <img src="docs/assets/android-brief-flagged-dosage.png" width="30%" alt="A clinical brief with an unreadable dose flagged for confirmation">
   <img src="docs/assets/review/paywall-legal-links.png" width="30%" alt="The Anteroom Pro paywall showing monthly and lifetime plans">
@@ -177,6 +199,11 @@ treatment, and is not a medical device. Every brief carries a reminder to check
 it against the original documents, because extraction from a photograph is
 imperfect by nature — which is the reason the app marks what it could not read
 instead of filling it in.
+
+## License
+
+MIT. See [LICENSE](LICENSE). Copyright (c) 2026 Ahmed Zayed and Gerhard
+Homveld.
 
 [Privacy Policy](https://anteroom-d2e72.web.app/privacy) ·
 [Terms of Use](https://anteroom-d2e72.web.app/terms) ·
