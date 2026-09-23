@@ -427,7 +427,6 @@ it can't confirm.
   [github.com/sorarx27/anteroom-mobile](https://github.com/sorarx27/anteroom-mobile)
   (branch `kotlin`), under the MIT license in [`LICENSE`](../LICENSE). It
   is built by an actively enrolled Master's student.
-  <!-- CHECK: enrollment claim must match the .edu email used for Next Gen verification -->
 - **Ship Kotlin Everywhere.** This award needs live App Store and Google Play
   listings. The code qualifies: 100% Compose Multiplatform UI and one
   `purchases-kmp` implementation for both stores. The listings do not yet.
@@ -445,7 +444,6 @@ it can't confirm.
   Researcher. MBBCh, Alexandria University, 2013. Twelve years in clinical
   practice. Currently enrolled in a Master's program at RWTH Aachen
   University.
-  <!-- CHECK: enrollment claim must match the .edu email used for Next Gen verification -->
 - **Gerhard Homveld** — Business entity and app publishing, through a US
   entity.
 
