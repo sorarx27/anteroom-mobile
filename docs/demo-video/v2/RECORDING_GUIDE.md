@@ -1,7 +1,13 @@
 # Recording guide: Anteroom demo v2
 
-About 45 minutes on an iPhone with the TestFlight build. You record 10 short
-screen clips and 14 short voice lines. `edit.py` does the editing.
+About 30 minutes on an iPhone with the TestFlight build. The narration is
+already done with ElevenLabs (`tts.py` → `vo/`), so this is screen clips
+only. `edit.py` does the editing.
+
+**The must-haves are G9 and G10, the purchase and the Pro export.** No other
+footage shows those. `anteroom-demo-v2-final.mp4` already covers G1–G8 with
+v1 footage, so record those too if you have time, but don't let them hold
+up G9 and G10.
 
 Watch `anteroom-demo-v2-animatic.mp4` first. Every yellow **STAND-IN** tag
 in it is a clip you replace, and the robot voice is the timing you read
@@ -76,45 +82,28 @@ them as they are. From any other model, run this on the Mac:
 ffmpeg -i IMG_1234.PNG -vf "scale=1179:-1:flags=lanczos,crop=1179:2556:0:0" devpost-1.png
 ```
 
-## The voice lines
+## Narration
 
-Record each line as its own file with **Voice Memos**, in a quiet room with
-the phone about 20 cm away. Read calmly, a little slower than conversation.
-Each line has to fit its time or the end gets cut. Name the files `01` to
-`14`, matching the numbers below.
-
-| # | Max | Line |
-| --- | --- | --- |
-| 01 | 4.7 s | In Spain the appointment is ten minutes and the paperwork is a folder. |
-| 02 | 3.7 s | Some of it is unreadable. A guessed dose is worse than none. |
-| 03 | 4.7 s | Anteroom turns that folder into one structured brief. |
-| 04 | 6.7 s | Pick the pages from your library, or photograph them. They upload to your account. |
-| 05 | 5.7 s | Gemini Flash types each document. One tap overrides it. |
-| 06 | 4.7 s | Gemini 2.5 Pro reads both pages, in the EU. |
-| 07 | 7.7 s | It found seven medications. *(beat)* And it refused to guess the eighth. |
-| 08 | 5.7 s | Every other drug has its dose, verbatim. Warfarin has none. |
-| 09 | 4.7 s | Tap the flag, and the original page is right there. |
-| 10 | 5.7 s | Export a PDF for the clinic. On the free tier, the server watermarks it. |
-| 11 | 9.7 s | Anteroom Pro runs on RevenueCat. Buy it, and the app unlocks the moment the entitlement lands. |
-| 12 | 5.7 s | Pro removes the watermark and renders the brief in Spanish. |
-| 13 | 4.7 s | The server decides. The app cannot unlock itself. |
-| 14 | 7.7 s | One Kotlin codebase. Live on iOS today. Try it on TestFlight. |
-
-Line 07 is the payoff. Slow down and leave the pause. Don't ad-lib: the
-burned-in captions show these exact words.
+Generated with ElevenLabs (voice "George", `eleven_multilingual_v2`). To
+change a line, edit its caption in `edit.py`, then run `python3 tts.py 07`
+(or whichever number). The caption, the narration and `captions.srt` all
+come from the same string, so they can't drift. A file you record yourself
+in `clips/vo/NN.m4a` takes precedence over the generated one.
 
 ## Assembling (whoever has the Mac)
 
 ```bash
 cd docs/demo-video/v2
-# clips/G1.mov … clips/G10.mov   and   clips/vo/01.m4a … 14.m4a
-python3 edit.py
+# clips/G1.mov … clips/G10.mov
+python3 edit.py --final
 ```
 
-Output: `build/anteroom-demo-v2.mp4`, 1920×1080, 86 s. The script lists any
+Output: `build/anteroom-demo-v2-final.mp4`, 1920×1080, 86 s, narrated.
+Leave off `--final` to get the review version with yellow STAND-IN tags. The script lists any
 clip still missing. If the magnified Warfarin callout in G5 shows the wrong
 strip of the screen, change `callout=0.52` on the `flag` shot in `edit.py`
 (0 is the top of the screen, 1 the bottom) and run it again.
 
-Then upload to **YouTube as Unlisted or Public**. Devpost needs a YouTube or
-Vimeo link, and the video must be under 2 minutes.
+Then upload to **YouTube as Unlisted or Public**, and add `captions.srt`
+under Subtitles. Devpost needs a YouTube or Vimeo link, and the video must
+be under 2 minutes.

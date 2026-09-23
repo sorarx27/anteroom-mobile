@@ -14,6 +14,24 @@ what doesn't.
 - **Repository branch:** `kotlin`
 - **Bundle ID:** `com.zayedmd.anteroom`
 
+## Devpost form, field by field
+
+| Field | Value |
+| --- | --- |
+| Project name | Anteroom |
+| Tagline | Photograph your medical paperwork. Walk into the appointment with one bilingual brief that flags what it could not read. |
+| Story | The sections below, from "Inspiration" to "What's next" |
+| Built with | kotlin, kotlin-multiplatform, compose-multiplatform, revenuecat, storekit, firebase, cloud-firestore, google-cloud-functions, python, vertex-ai, gemini, elevenlabs |
+| Video | YouTube link to `docs/demo-video/v2/anteroom-demo-v2-final.mp4`, with `captions.srt` uploaded |
+| Try it out | <https://testflight.apple.com/join/EvbxqXGU> and <https://github.com/sorarx27/anteroom-mobile> |
+| App Store link | *add when approved* |
+| Screenshot, 1179×2556 | `docs/assets/devpost/screenshot-1-welcome.png` |
+| App icon, 1024×1024 | `docs/assets/devpost/app-icon-1024.png` |
+| Judge access | The "For judges" block below |
+
+The narration is synthetic (ElevenLabs), and that's why `elevenlabs` is in
+Built with. The footage is real app output.
+
 ## For judges
 
 - **Install.** iOS beta on TestFlight:

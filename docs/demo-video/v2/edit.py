@@ -14,6 +14,11 @@ build/anteroom-demo-v2-silent.mp4.
 """
 import glob, os, subprocess, sys
 
+# --final: nothing labelled. Missing clips use their v1 stand-in untagged, and
+# shots with no v1 footage use their `fallback` full-frame still instead of a
+# slate. This is the cut you can submit before the iPhone footage exists.
+FINAL = "--final" in sys.argv
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 PIPE = os.path.join(HERE, "..", "pipeline")
 sys.path.insert(0, PIPE)
@@ -50,7 +55,7 @@ SHOTS = [
 
     dict(id="hero", dur=5, kind="clip", clip="G1", ss=0.0, v1=9.5,
          eyebrow="Anteroom", head="The waiting room does the paperwork",
-         sub="On iPhone, signed into the live project.",
+         sub="A real account, signed into the live project.",
          cap="Anteroom turns that folder into one structured brief."),
     dict(id="capture", dur=7, kind="clip", clip="G2", ss=0.0, v1=14.5,
          eyebrow="Step 1", head="Two pages, straight from the library",
@@ -85,12 +90,14 @@ SHOTS = [
          eyebrow="RevenueCat", head="Upgrade, and Pro unlocks itself",
          sub="purchases-kmp on StoreKit. Sandbox purchase on the TestFlight build.",
          cap="Anteroom Pro runs on RevenueCat. Buy it, and the app unlocks the moment the entitlement lands.",
-         slate="Paywall  >  Monthly  >  Apple sheet  >  Pro unlocked"),
+         slate="Paywall  >  Monthly  >  Apple sheet  >  Pro unlocked",
+         fallback="st_purchase-card.png"),
     dict(id="export-pro", dur=6, kind="clip", clip="G10", ss=0.0, v1=None,
          eyebrow="Pro", head="Clean export, in Spanish",
          sub="Doses and drug names are copied, never re-translated.",
          cap="Pro removes the watermark and renders the brief in Spanish.",
-         slate="Español  >  Download PDF  >  no watermark"),
+         slate="Español  >  Download PDF  >  no watermark",
+         fallback="st_export-2.png"),
     dict(id="server", dur=5, kind="static", img="st_billing-2.png",
          cap="The server decides. The app cannot unlock itself."),
     dict(id="cta", dur=8, kind="static", img="st_cta-v2.png",
@@ -142,7 +149,7 @@ def overlay(s, stand_in):
         draw_block(d, TX, y + 22, s["sub"], font(29), (168, 190, 178), TW, 42)
     if s.get("badge"):
         tag(d, TX, 240, s["badge"], (198, 74, 66, 235))
-    if stand_in:
+    if stand_in and not FINAL:
         tag(d, TX, 176, f"STAND-IN  ·  record {s['clip']} on iPhone", (240, 196, 64, 255))
     has_callout = callout_y(s, stand_in) is not None
     if has_callout:
@@ -187,6 +194,28 @@ def cta_v2():
     return base
 
 
+def purchase_card():
+    """Fallback for the purchase shot: the integration, stated, not staged."""
+    base = gradient_bg().convert("RGBA")
+    d = ImageDraw.Draw(base, "RGBA")
+    y = eyebrow(d, 130, 96, "RevenueCat")
+    draw_block(d, 130, y, "One purchases-kmp implementation, two stores",
+               font(54, bold=True), PAPER, 1660, 66)
+    rows = [("Entitlement", "anteroom_pro"),
+            ("Offering", "default:  $rc_monthly  US$9.99  ·  $rc_lifetime  US$99.99"),
+            ("iOS", "StoreKit, live on the TestFlight build"),
+            ("Android", "same RevenueCatServiceImpl, Play listing pending"),
+            ("Source of truth", "PurchasesDelegate  →  SubscriptionService flow"),
+            ("Server", "webhook is the only writer of the entitlement")]
+    y = 330
+    for k, v in rows:
+        d.text((130, y), k, font=font(28, bold=True), fill=BRAND_LT)
+        d.text((520, y), v, font=font(28, mono=True), fill=(210, 224, 217))
+        y += 78
+    caption_bar(base, next(x for x in SHOTS if x["id"] == "purchase")["cap"])
+    return base
+
+
 def phone_chain(s, stand_in):
     """Filter producing [v]: the phone screen, PW x PH, 30fps, exactly dur."""
     d = s["dur"]
@@ -208,18 +237,37 @@ def callout_y(s, stand_in):
     return s.get("callout")
 
 
+def recaption(src, cap, name):
+    """Reused v1 stills carry v1 captions. Replace the strip so caption and
+    narration are always the same string."""
+    img = Image.open(src).convert("RGBA")
+    ImageDraw.Draw(img).rectangle([0, H - 106, W, H], fill=(6, 11, 9, 255))
+    out = os.path.join(BUILD, f"cap_{name}.png")
+    caption_bar(img, cap).save(out)
+    return out
+
+
 def render_shot(s):
     out = os.path.join(SEG, f"{s['id']}.mp4")
     d = s["dur"]
     if s["kind"] == "static":
         img = os.path.join(PIPE, s["img"]) if s["img"] != "st_cta-v2.png" \
             else os.path.join(BUILD, s["img"])
+        img = recaption(img, s["cap"], s["id"])
         run(["ffmpeg", "-y", "-v", "error", "-loop", "1", "-t", str(d), "-i", img,
              "-vf", "scale=1920:1080,format=yuv420p", *V, out])
         return "static"
 
     clip = find_clip(s["clip"])
     stand_in = clip is None
+    if stand_in and FINAL and s.get("v1") is None:
+        still = s["fallback"]
+        img = (os.path.join(BUILD, still) if still == "st_purchase-card.png"
+               else os.path.join(PIPE, still))
+        img = recaption(img, s["cap"], s["id"])
+        run(["ffmpeg", "-y", "-v", "error", "-loop", "1", "-t", str(d), "-i", img,
+             "-vf", "scale=1920:1080,format=yuv420p", *V, out])
+        return "FALLBACK"
     ov = os.path.join(BUILD, f"ov_{s['id']}.png")
     overlay(s, stand_in).save(ov)
     if not stand_in:
@@ -254,19 +302,29 @@ def main():
             run([sys.executable, os.path.join(PIPE, "build_frames.py")])
             break
     cta_v2().save(os.path.join(BUILD, "st_cta-v2.png"))
+    purchase_card().save(os.path.join(BUILD, "st_purchase-card.png"))
 
     missing = []
     for s in SHOTS:
         src = render_shot(s)
-        if src == "STAND-IN":
+        if src in ("STAND-IN", "FALLBACK"):
             missing.append(s["clip"])
         print(f"  {s['id']:<12} {s['dur']:>2}s  {src}")
+
+    def ts(x):
+        return f"{int(x // 3600):02d}:{int(x % 3600 // 60):02d}:{int(x % 60):02d},{int(round(x % 1 * 1000)):03d}"
+    with open(os.path.join(HERE, "captions.srt"), "w") as f:
+        t = 0
+        for i, sh in enumerate(SHOTS, 1):
+            f.write(f"{i}\n{ts(t + 0.2)} --> {ts(t + sh['dur'] - 0.1)}\n{sh['cap']}\n\n")
+            t += sh["dur"]
 
     lst = os.path.join(SEG, "concat.txt")
     with open(lst, "w") as f:
         for s in SHOTS:
             f.write(f"file '{os.path.join(SEG, s['id'] + '.mp4')}'\n")
-    silent = os.path.join(BUILD, "anteroom-demo-v2-silent.mp4")
+    tag_ = "-final" if FINAL else ""
+    silent = os.path.join(BUILD, f"anteroom-demo-v2{tag_}-silent.mp4")
     # Fade in from the first real frame, not from black: the opening must show
     # the documents immediately.
     run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst,
@@ -274,10 +332,12 @@ def main():
          *V, "-movflags", "+faststart", silent])
     print(f"\nwrote {silent}  ({TOTAL}s)")
 
-    final = os.path.join(BUILD, "anteroom-demo-v2.mp4")
+    final = os.path.join(BUILD, f"anteroom-demo-v2{tag_}.mp4")
     lines, t = [], 0
     for i, sh in enumerate(SHOTS, 1):
-        hit = sorted(glob.glob(os.path.join(CLIPS, "vo", f"{i:02d}.*")))
+        # A recorded line in clips/vo wins over the generated one in vo/.
+        hit = (sorted(glob.glob(os.path.join(CLIPS, "vo", f"{i:02d}.*")))
+               or sorted(glob.glob(os.path.join(HERE, "vo", f"{i:02d}.*"))))
         if hit:
             lines.append((hit[0], t, sh["dur"]))
         t += sh["dur"]
