@@ -90,6 +90,7 @@ fun AnteroomApp(
     // changes so entitlements follow the Anteroom account rather than the device.
     LaunchedEffect(user?.user_id) {
         AiConsent.bind(user?.user_id)
+        if (SubscriptionService.FREE_FOR_EVERYONE) return@LaunchedEffect
         revenueCatService.initialize(defaultRevenueCatApiKey(), user?.user_id)
         revenueCatService.refreshCustomerInfo()
         revenueCatService.fetchOfferings()
@@ -390,7 +391,7 @@ fun AnteroomApp(
                             )
                         }
 
-                        if (showPaywallModal) {
+                        if (showPaywallModal && !SubscriptionService.FREE_FOR_EVERYONE) {
                             PaywallModal(
                                 triggerReason = paywallTrigger,
                                 revenueCatService = revenueCatService,

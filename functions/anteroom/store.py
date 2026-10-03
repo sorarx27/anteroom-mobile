@@ -20,6 +20,7 @@ from firebase_functions import https_fn
 from anteroom.config import (
     DAILY_MODEL_CALLS_PER_USER,
     ENTITLEMENT_DOC,
+    FREE_FOR_EVERYONE,
     IMAGE_JPEG_QUALITY,
     IMAGE_LONG_EDGE,
     MAX_PAGES,
@@ -130,6 +131,8 @@ def is_pro(uid: str) -> bool:
     trusted here -- that flag was the entire paywall for the PDF and the
     translation, and it lives in a process the user controls.
     """
+    if FREE_FOR_EVERYONE:
+        return True
     try:
         ref = db().document(f"users/{uid}/{ENTITLEMENT_DOC}")
         snap = ref.get()

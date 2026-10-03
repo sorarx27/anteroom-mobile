@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zayedmd.anteroom.model.AppUser
 import com.zayedmd.anteroom.model.Profile
+import com.zayedmd.anteroom.subscription.SubscriptionService
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
 
 @Composable
@@ -69,7 +70,9 @@ fun DashboardHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (isSubscribed) {
+            if (SubscriptionService.FREE_FOR_EVERYONE) {
+                // Nothing to badge or sell when every account has everything.
+            } else if (isSubscribed) {
                 Surface(
                     shape = RoundedCornerShape(999.dp),
                     color = AnteroomColors.BrandPrimary

@@ -67,4 +67,9 @@ RUNTIME_CONFIG_DOC = "config/runtime"
 ENTITLEMENT_DOC = "billing/entitlement"
 ENTITLEMENT_ID = "anteroom_pro"
 
+# Anteroom ships free: every account gets the clean export and translation,
+# and nothing is sold. Mirrors SubscriptionService.FREE_FOR_EVERYONE in the
+# app. This is the switch that counts, because the client is not trusted.
+FREE_FOR_EVERYONE = True
+
 SUPPORTED_LANGUAGES = ("en", "es")

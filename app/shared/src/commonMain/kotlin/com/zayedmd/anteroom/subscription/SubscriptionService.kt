@@ -16,11 +16,22 @@ interface SubscriptionManager {
  * - an optimistic unlock here would survive a failed or refunded purchase.
  */
 object SubscriptionService : SubscriptionManager {
-    // Free tier until RevenueCat says otherwise.
-    private val _isSubscribed = MutableStateFlow(false)
+    /**
+     * Every feature unlocked for every account, and nothing for sale.
+     *
+     * Anteroom ships free while its publisher's residence status does not
+     * allow selling it. With this on, every Pro guard in the UI passes, the
+     * Upgrade surfaces never render, and RevenueCat is never configured, so
+     * no store product is requested. The server has the same switch
+     * (`FREE_FOR_EVERYONE` in functions/anteroom/config.py) and it is the one
+     * that matters for the watermark and translation; the two must agree.
+     */
+    const val FREE_FOR_EVERYONE = true
+
+    private val _isSubscribed = MutableStateFlow(FREE_FOR_EVERYONE)
     override val isSubscribed: StateFlow<Boolean> = _isSubscribed.asStateFlow()
 
     override fun setSubscribed(subscribed: Boolean) {
-        _isSubscribed.value = subscribed
+        _isSubscribed.value = FREE_FOR_EVERYONE || subscribed
     }
 }

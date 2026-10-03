@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.sp
 import com.zayedmd.anteroom.auth.AuthService
 import com.zayedmd.anteroom.data.AiConsent
 import com.zayedmd.anteroom.model.AppUser
+import com.zayedmd.anteroom.subscription.SubscriptionService
 import com.zayedmd.anteroom.ui.LegalLinks
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
 import com.zayedmd.anteroom.ui.userMessage
@@ -124,10 +125,11 @@ fun AccountSheet(
                 Text(
                     "This erases your account, every brief, every page you photographed, " +
                         "and your family profiles. It cannot be undone, and support cannot " +
-                        "recover it.\n\n" +
-                        "An active subscription is billed by the App Store or Google Play, " +
-                        "not by Anteroom. Cancel it in your store account — deleting here " +
-                        "does not stop it."
+                        "recover it." +
+                        if (SubscriptionService.FREE_FOR_EVERYONE) "" else
+                            "\n\nAn active subscription is billed by the App Store or Google " +
+                                "Play, not by Anteroom. Cancel it in your store account — " +
+                                "deleting here does not stop it."
                 )
             },
             confirmButton = {
