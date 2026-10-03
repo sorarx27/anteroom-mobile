@@ -178,6 +178,7 @@ class BriefsRepositoryImpl : BriefsRepository {
     // ---------------------------------------------------------------------
 
     override suspend fun detectDocType(briefId: String): DocType {
+        AiConsent.require()
         classifyFn.invoke(ClassifyRequest.serializer(), ClassifyRequest(briefId))
         val refreshed = getBrief(briefId)
         return refreshed?.detected_doc_type ?: refreshed?.doc_type ?: DocType.other
@@ -189,6 +190,7 @@ class BriefsRepositoryImpl : BriefsRepository {
         // model outputs: the extraction prompt forbids translating, because
         // copying dosages verbatim is the safety guarantee. Getting a Spanish
         // brief is an explicit, separate translate step.
+        AiConsent.require()
         generateFn.invoke(
             GenerateRequest.serializer(),
             GenerateRequest(briefId, sourceLanguage.key)
@@ -198,6 +200,7 @@ class BriefsRepositoryImpl : BriefsRepository {
     }
 
     override suspend fun translateBrief(briefId: String, targetLanguage: BriefLanguage): Brief {
+        AiConsent.require()
         translateFn.invoke(
             TranslateRequest.serializer(),
             TranslateRequest(briefId, targetLanguage.key)

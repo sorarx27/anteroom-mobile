@@ -1,4 +1,4 @@
 package com.zayedmd.anteroom.subscription
 
-/** App Store key. Currently the RevenueCat Test Store key until an `appl_` key is issued. */
+/** The RevenueCat key for the store iOS buys from; see [RevenueCatConfig.IOS_USE_APP_STORE]. */
 actual fun defaultRevenueCatApiKey(): String = RevenueCatConfig.iosApiKey

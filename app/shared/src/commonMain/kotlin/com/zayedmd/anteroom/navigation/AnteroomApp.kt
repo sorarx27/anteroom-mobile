@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import com.zayedmd.anteroom.auth.AuthService
 import com.zayedmd.anteroom.auth.AuthServiceImpl
 import com.zayedmd.anteroom.auth.AuthStatus
+import com.zayedmd.anteroom.data.AiConsent
 import com.zayedmd.anteroom.data.BriefsRepository
 import com.zayedmd.anteroom.data.BriefsRepositoryImpl
 import com.zayedmd.anteroom.data.PhotoUploadService
@@ -34,6 +35,7 @@ import com.zayedmd.anteroom.subscription.defaultRevenueCatApiKey
 import com.zayedmd.anteroom.ui.AnteroomErrors
 import com.zayedmd.anteroom.ui.ConfigureImageLoading
 import com.zayedmd.anteroom.ui.launchSafely
+import com.zayedmd.anteroom.ui.components.AiConsentDialog
 import com.zayedmd.anteroom.ui.components.ErrorBanner
 import com.zayedmd.anteroom.ui.components.PaywallModal
 import com.zayedmd.anteroom.ui.screens.*
@@ -82,10 +84,12 @@ fun AnteroomApp(
     var activeBriefId by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
+    val aiConsentRequest by AiConsent.request.collectAsState()
 
     // Configure RevenueCat once, then re-key the purchase identity whenever the signed-in user
     // changes so entitlements follow the Anteroom account rather than the device.
     LaunchedEffect(user?.user_id) {
+        AiConsent.bind(user?.user_id)
         revenueCatService.initialize(defaultRevenueCatApiKey(), user?.user_id)
         revenueCatService.refreshCustomerInfo()
         revenueCatService.fetchOfferings()
@@ -212,6 +216,9 @@ fun AnteroomApp(
                                     },
                                     onSnapClick = {
                                         scope.launchSafely {
+                                            // Ask before the camera opens, so nobody photographs a
+                                            // page only to learn afterwards where it is going.
+                                            if (!AiConsent.ensure()) return@launchSafely
                                             // ensureSelfProfile rather than a lookup with a
                                             // "default" fallback: the Firestore rule for creating
                                             // a brief checks the referenced profile document
@@ -374,6 +381,13 @@ fun AnteroomApp(
                                     }
                                 )
                             }
+                        }
+
+                        if (aiConsentRequest != null) {
+                            AiConsentDialog(
+                                onAgree = { AiConsent.answer(true) },
+                                onDecline = { AiConsent.answer(false) }
+                            )
                         }
 
                         if (showPaywallModal) {

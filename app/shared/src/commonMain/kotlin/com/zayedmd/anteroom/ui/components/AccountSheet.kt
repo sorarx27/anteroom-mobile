@@ -11,6 +11,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zayedmd.anteroom.auth.AuthService
+import com.zayedmd.anteroom.data.AiConsent
 import com.zayedmd.anteroom.model.AppUser
 import com.zayedmd.anteroom.ui.LegalLinks
 import com.zayedmd.anteroom.ui.theme.AnteroomColors
@@ -44,6 +45,8 @@ fun AccountSheet(
     var confirmingDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val aiConsentGranted by AiConsent.granted.collectAsState()
+    var aiConsentWithdrawn by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = { if (!deleting) onDismiss() },
@@ -76,6 +79,23 @@ fun AccountSheet(
             HorizontalDivider(color = AnteroomColors.Border)
             AccountSheetRow("Support") { uriHandler.openUri(LegalLinks.SUPPORT) }
             HorizontalDivider(color = AnteroomColors.Border)
+            // Guideline 5.1.2(i): permission that can be given must be revocable
+            // from inside the app, not only by deleting the account.
+            if (aiConsentGranted) {
+                AccountSheetRow("Stop sending documents to AI") {
+                    AiConsent.withdraw()
+                    aiConsentWithdrawn = true
+                }
+                HorizontalDivider(color = AnteroomColors.Border)
+            } else if (aiConsentWithdrawn) {
+                Text(
+                    text = "Done. Anteroom will ask again before sending any document to Gemini.",
+                    fontSize = 13.sp,
+                    color = AnteroomColors.OnSurfaceSecondary,
+                    modifier = Modifier.padding(vertical = 15.dp)
+                )
+                HorizontalDivider(color = AnteroomColors.Border)
+            }
             AccountSheetRow("Sign out") {
                 scope.launch { authService.signOut() }
             }

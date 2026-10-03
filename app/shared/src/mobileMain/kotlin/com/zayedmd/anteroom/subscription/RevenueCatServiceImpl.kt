@@ -247,7 +247,10 @@ class RevenueCatServiceImpl : RevenueCatService {
             title = product.title.ifBlank { fallback.title },
             description = product.localizedDescription?.takeIf { it.isNotBlank() }
                 ?: fallback.description,
-            priceString = product.price.formatted,
+            // StoreKit's formatted price has no period, so "$9.99" alone on a
+            // subscription would hide what Guideline 3.1.2 wants beside the
+            // price: how often it is charged. The fallback already says /mo.
+            priceString = if (lifetime) product.price.formatted else "${product.price.formatted}/mo",
             priceMicros = product.price.amountMicros,
             currencyCode = product.price.currencyCode,
             isLifetime = lifetime
