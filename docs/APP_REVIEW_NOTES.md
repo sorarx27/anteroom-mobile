@@ -59,6 +59,14 @@ fastest way to see it.
 > subscription record and the sign-in credential. Please use a throwaway
 > account rather than the demo one if you intend to complete it.
 >
+> Third-party AI: briefs are produced by Google's Gemini models (Gemini 2.5
+> Pro and 2.5 Flash) on Google Cloud Vertex AI, europe-west1. No other AI
+> service is used. Before any page is sent, the app shows a consent screen
+> that names Gemini and Google, says what is sent, and offers Agree or Not
+> now; declining sends nothing. It appears the first time you tap Snap
+> paperwork (or open a draft, generate, or translate). Consent can be
+> withdrawn under the avatar: Stop sending documents to AI.
+>
 > To find the legal links: tap Upgrade, then scroll to the bottom of the
 > purchase screen. Terms of Use and Privacy Policy are below Restore
 > purchases, with the renewal terms above them. The same three links are also
@@ -195,10 +203,27 @@ and adds the medical disclaimer, which the standard EULA does not carry.
 
 ## Build numbers
 
-`CURRENT_PROJECT_VERSION` is **2** in
-`app/iosApp/Configuration/Config.xcconfig`. Build 1 is already processed on
-TestFlight, and App Store Connect rejects a re-used build number at upload
-rather than at submission. Bump it before every archive.
+`CURRENT_PROJECT_VERSION` is **5** in
+`app/iosApp/Configuration/Config.xcconfig`. App Store Connect rejects a
+re-used build number at upload rather than at submission. Bump it before
+every archive.
+
+## Review history
+
+- **1.0 (4), 24 Sep 2026: 3.1.2.** No Terms of Use (EULA) link in the App
+  Store description. Fixed in metadata only: Terms, Apple's standard EULA and
+  the Privacy Policy are now linked at the end of the description.
+- **1.0 (4), 3 Oct 2026: 2.1(b) and 2.1.** The paywall showed "Plans aren't
+  available on this device right now." The RevenueCat project had the
+  products only under the Test Store app; the App Store app had none, so the
+  `appl_` key returned an empty offering. Fixed in the RevenueCat dashboard.
+  Check it with `GET https://api.revenuecat.com/v1/subscribers/x/offerings`
+  using the `appl_` key and `X-Platform: ios`: every package must carry a
+  `platform_product_identifier`. App Review also asked whether the app uses
+  third-party AI, which is how Guideline 5.1.2(i) is enforced; build 5 adds
+  the consent gate in `data/AiConsent.kt`.
+- Reviewers leave empty drafts on the demo account each round. Delete them
+  before resubmitting so the dashboard opens on the three complete briefs.
 
 ## Still open
 
@@ -207,6 +232,8 @@ rather than at submission. Bump it before every archive.
   rule forwarding that address to a real inbox must exist — a privacy policy
   for EU health data with an unreachable contact is worse than no address.
   Check it by sending a message to it.
+- **`anteroom.app` is not ours.** It belongs to an unrelated product, so
+  `support@anteroom.app` must not appear anywhere.
 - **`anteroom.app` serves a different product.** The apex currently returns an
   unrelated "AnteRoom — Meet Professionals" page, which is why the legal URLs
   point at `anteroom-d2e72.web.app` instead. Worth pointing the domain at
